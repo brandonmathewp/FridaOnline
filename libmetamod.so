@@ -1,0 +1,3113 @@
+#include "Includes/Logger.h"
+#include "Includes/Macros.h"
+#include "Includes/obfuscate.h"
+#include "Includes/Utils.h"
+#include "ImGui/Call_ImGui.h"
+#include "IL2CppSDKGenerator/BasicStructs/Call_BasicStructs.h"
+#include "IL2CppSDKGenerator/IL2Cpp/Call_IL2Cpp.h"
+#include "Hacks/Hacks.h"
+#include "IL2CppSDKGenerator/KittyMemory/MemoryPatch.h"
+#include "foxcheats/include/ScanEngine.hpp"
+#include "FTools/Iconcpp.h"
+#include "FTools/Font.h"
+#include "FTools/Icon.h"
+
+#include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <string>
+#include <cstring>
+#include <jni.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <android/log.h>
+#include <iostream>
+#include <fstream>
+#include <map>
+#include <unordered_map>
+#include <sstream>
+
+#include "oxorany/source/oxorany.h"
+#include "oxorany/source/oxorany.cpp"
+#include "oxorany/source/oxorany_include.h"
+
+#include "ctorHook/ConstructorHook.hpp"
+#include "Skin/Fields.h"
+#include "Skin/Thread.h"
+#include "Skin/Misc.h"
+
+#include "System/Hooks/Feats.h"
+#include "System/Hooks/Kfox.h"
+
+#include "System/Core/FileUtils.h"
+#include "System/Core/ConfigManager.h"
+#include "System/Core/SaveKey.h"
+#include "System/Core/Bypass.h"
+
+#include "System/UI/TextureLoader.h"
+#include "System/UI/SettingsTab.h"
+
+#include "System/Texture/PlayersOff.h"
+#include "System/Texture/PlayersOn.h"
+#include "System/Texture/RageBotOff.h"
+#include "System/Texture/RageBotOn.h"
+#include "System/Texture/ScriptsOff.h"
+#include "System/Texture/ScriptsOn.h"
+#include "System/Texture/WorldOff.h"
+#include "System/Texture/WorldOn.h"
+#include "System/Texture/SettingsOff.h"
+#include "System/Texture/SettingsOn.h"
+#include "System/Texture/DOT.h"
+
+#include "IMAGE/astral.h"
+#include "IMAGE/Logo.h"
+#include "Fonts/X2.h"
+#include "Fonts/New.h"
+#include "Fonts/New1.h"
+
+#include "AstralPrtctn/StrEnc.h"
+#include "AstralPrtctn/json.hpp"
+#include "AstralPrtctn/md5.h"
+#include "curl/curl.h"
+#include "Includes/Jni_Stuff.h"
+
+class _BYTE;
+class _BOOL4;
+class _BOOL8;
+class _WORD;
+class _DWORD;
+class _QWORD;
+
+bool ClearDisplay = false;
+bool ShowFPS;
+bool WideV = false;
+float WideVsize = 0.0f;
+bool Vehicle = false;
+float VehicleS = 0.0f;
+bool SnowB = false;
+float SnowBsize = 0.0f;
+bool isSpeedHackEnabled = false;
+float speedHackMultiplier = 0.0f;
+bool isJumpAdjustmentEnabled = false;
+float jumpHeightMultiplier = 1.0f;
+bool RedWallhackShow = false;
+char logintext[4096];
+
+// Legacy character picker flag retained for compatibility; characters now render inline.
+bool g_OpenCharacterPicker = false;
+
+float g_LastLogoOpacity = 1.0f;
+float g_LastLogoSize = 1.0f;
+int g_LogoHideDelayFrames = 0;
+int g_LogoHideDelay = 40;
+
+#define _BYTE uint8_t
+#define _WORD  uint8_t
+#define _DWORD uint64_t
+#define _QWORD uint64_t
+#define _BOOL4 uint8_t
+
+#include <fstream>
+using namespace std;
+
+#include <Substrate/SubstrateHook.h>
+#include <Substrate/CydiaSubstrate.h>
+
+ImFont* medium;
+ImFont* bold;
+ImFont* tab_icons;
+ImFont* logo;
+ImFont* tab_title;
+ImFont* tab_title_icon;
+ImFont* subtab_title;
+ImFont* combo_arrow;
+ImFont* F48;
+ImFont* F50;
+ImFont* JAAT;
+ImFont* SOCIAL;
+JavaVM* VM = nullptr;
+
+float menu[4] = {255 / 255.f, 255 / 255.f, 255 / 255.f, 1.000f};
+
+float accent_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+struct My_Patches
+{
+    MemoryPatch A1, rpd;
+} Patches;
+
+float AVIWA = 119.167f;
+
+bool wallh;
+bool NoSmoke, nosmoke = false;
+bool active = false;
+float AimSmooth = 1.0f;
+
+struct sRegion
+{
+    uintptr_t start, end;
+};
+
+std::chrono::steady_clock::time_point appStartTime = std::chrono::steady_clock::now();
+
+std::string FormatTimeDuration(std::chrono::steady_clock::duration duration)
+{
+    auto hours = std::chrono::duration_cast<std::chrono::hours>(duration).count();
+    auto minutes = std::chrono::duration_cast<std::chrono::minutes>(duration % std::chrono::hours(1)).count();
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration % std::chrono::minutes(1)).count();
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", (int)hours, (int)minutes, (int)seconds);
+    return std::string(buffer);
+}
+
+static bool windowCollapsed = false;
+bool g_LogoPreviewMode = false;
+static bool isLogin = true;
+static std::string err;
+static std::string storedKey = "";
+static char s[256];
+
+std::vector<sRegion> trapRegions;
+uintptr_t address = 0;
+std::string md5(std::string s);
+uintptr_t g_il2cpp;
+static bool isMenuVisible = true;
+
+
+struct MenuNotification
+{
+    std::string text;
+    float createdAt;
+    bool  enabled;    // true = green, false = red
+};
+
+static std::vector<MenuNotification> g_MenuNotifications;
+
+static std::string ToUpperFeatureLabel(const char* label)
+{
+    std::string result;
+    bool lastWasSpace = false;
+    for (const char* p = label; *p; ++p)
+    {
+        char c = *p;
+        if (c == '#' || c == '\0') break;
+        if (c == '_' || c == '-') c = ' ';
+        if (c >= 'a' && c <= 'z') c = (char)(c - 'a' + 'A');
+        if (c == ' ')
+        {
+            if (!result.empty() && !lastWasSpace)
+            {
+                result.push_back(c);
+                lastWasSpace = true;
+            }
+        }
+        else
+        {
+            result.push_back(c);
+            lastWasSpace = false;
+        }
+    }
+    while (!result.empty() && result.back() == ' ') result.pop_back();
+    return result.empty() ? "FEATURE" : result;
+}
+
+static void PushMenuNotification(const char* label, bool enabled)
+{
+    std::string message = ToUpperFeatureLabel(label);
+    message += enabled ? " ENABLED" : " DISABLED";
+    g_MenuNotifications.push_back({message, (float)ImGui::GetTime(), enabled});
+    if (g_MenuNotifications.size() > 5)
+    {
+        g_MenuNotifications.erase(g_MenuNotifications.begin());
+    }
+}
+
+static bool NotifyCheckbox(const char* label, bool* value)
+{
+    bool changed = ImGui::Checkbox(label, value);
+    if (changed)
+    {
+        PushMenuNotification(label, *value);
+    }
+    return changed;
+}
+
+static void RenderMenuNotifications()
+{
+    const float now = (float)ImGui::GetTime();
+    ImDrawList* draw = ImGui::GetForegroundDrawList();
+    ImVec2 display = ImGui::GetIO().DisplaySize;
+    const float lifetime = 2.8f;
+    const float fadeTime = 0.35f;
+    const float paddingX = 22.0f;
+    const float paddingY = 14.0f;
+    const float gap = 10.0f;
+    float y = display.y - 34.0f;
+
+    for (int i = (int)g_MenuNotifications.size() - 1; i >= 0; --i)
+    {
+        float age = now - g_MenuNotifications[i].createdAt;
+        if (age > lifetime)
+        {
+            g_MenuNotifications.erase(g_MenuNotifications.begin() + i);
+            continue;
+        }
+
+        float alpha = 1.0f;
+        if (age > lifetime - fadeTime)
+        {
+            alpha = (lifetime - age) / fadeTime;
+        }
+
+        ImVec2 textSize = ImGui::CalcTextSize(g_MenuNotifications[i].text.c_str());
+        float width = textSize.x + paddingX * 2.0f;
+        float height = textSize.y + paddingY * 2.0f;
+        ImVec2 min((display.x - width) * 0.5f, y - height);
+        ImVec2 max(min.x + width, y);
+
+        // Colored dot + colored text: green for ENABLED, red for DISABLED
+        const bool en = g_MenuNotifications[i].enabled;
+        ImU32 dotCol  = en ? ImColor(60, 220, 90, (int)(255 * alpha))
+                           : ImColor(230, 60, 60, (int)(255 * alpha));
+        ImU32 textCol = en ? ImColor(100, 235, 120, (int)(255 * alpha))
+                           : ImColor(245, 90, 90,  (int)(255 * alpha));
+        ImU32 borderCol = en ? ImColor(60, 220, 90, (int)(120 * alpha))
+                             : ImColor(230, 60, 60, (int)(120 * alpha));
+
+        draw->AddRectFilled(min, max, ImColor(12, 12, 12, (int)(220 * alpha)), 14.0f, ImDrawFlags_RoundCornersAll);
+        draw->AddRect(min, max, borderCol, 14.0f, ImDrawFlags_RoundCornersAll, 1.6f);
+
+        // leading status dot
+        float dotR = 4.5f;
+        ImVec2 dotCenter(min.x + paddingX + dotR, (min.y + max.y) * 0.5f);
+        draw->AddCircleFilled(dotCenter, dotR, dotCol, 18);
+
+        ImVec2 textPos(dotCenter.x + dotR + 8.0f, min.y + paddingY);
+        draw->AddText(textPos, textCol, g_MenuNotifications[i].text.c_str());
+        y -= height + gap;
+    }
+}
+
+// ============================================================
+//  NEW VIRTUAL KEYBOARD  (slide-in animated, rounded dark keys)
+//  - Quick-filter keys [M] [L] [E] insert MYTHIC / LEGENDARY / EPIC
+//    so they actually filter the skin list.
+//  - Positioned INSIDE the current ImGui window (works anywhere we call it).
+// ============================================================
+struct KeyboardAnimationState {
+    float hover_alpha = 0.0f;
+    float press_alpha = 0.0f;
+    float press_time  = 0.0f;
+};
+
+struct KeyboardState {
+    bool  is_visible       = false;
+    float show_time        = 0.0f;
+    bool  allow_clicks     = false;
+    float open_progress    = 0.0f;
+    float last_frame_time  = 0.0f;
+};
+
+static std::map<std::string, KeyboardState> g_kbStates;
+static std::map<std::string, KeyboardAnimationState> g_kbKeyAnims;
+
+namespace keyboard_ui {
+
+inline size_t SafeLen(const char* text, size_t max_len) {
+    if (text == nullptr || max_len == 0) return 0;
+    size_t len = 0;
+    while (len < max_len && text[len] != '\0') ++len;
+    return len;
+}
+
+inline void AppendText(char* buffer, size_t capacity, const char* text) {
+    if (buffer == nullptr || text == nullptr || capacity == 0) return;
+    size_t current_len = SafeLen(buffer, capacity);
+    if (current_len >= capacity - 1) return;
+    size_t add_len    = std::strlen(text);
+    size_t remaining  = (capacity - 1) - current_len;
+    size_t copy_len   = std::min(add_len, remaining);
+    if (copy_len == 0) return;
+    std::memcpy(buffer + current_len, text, copy_len);
+    buffer[current_len + copy_len] = '\0';
+}
+
+inline void Backspace(char* buffer, size_t capacity) {
+    if (buffer == nullptr || capacity == 0) return;
+    size_t len = SafeLen(buffer, capacity);
+    if (len > 0) buffer[len - 1] = '\0';
+}
+
+inline float EaseOutSmoothstep(float t) {
+    t = ImClamp(t, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+inline float ComputeDeltaTime(float current_time, float& last_time) {
+    float dt = current_time - last_time;
+    if (last_time <= 0.0f || dt <= 0.0f || dt > 0.1f) dt = 1.0f / 60.0f;
+    last_time = current_time;
+    return dt;
+}
+
+inline bool DrawKeyButton(
+    ImDrawList* draw,
+    const std::string& full_id,
+    const char* label,
+    const ImVec2& rect_min,
+    const ImVec2& rect_max,
+    bool allow_clicks,
+    float current_time,
+    float dt,
+    float ui_alpha,
+    bool dark_key)
+{
+    auto& anim = g_kbKeyAnims[full_id];
+
+    const bool hovered = ImGui::IsMouseHoveringRect(rect_min, rect_max);
+    const bool clicked = hovered && allow_clicks && ImGui::IsMouseClicked(0);
+
+    const float target_hover = hovered ? 1.0f : 0.0f;
+    anim.hover_alpha += (target_hover - anim.hover_alpha) * (12.0f * dt);
+    anim.hover_alpha = ImClamp(anim.hover_alpha, 0.0f, 1.0f);
+
+    if (clicked) {
+        anim.press_time = current_time;
+        anim.press_alpha = 1.0f;
+    }
+    const float since_press = current_time - anim.press_time;
+    if (since_press < 0.15f) anim.press_alpha = 1.0f - (since_press / 0.15f);
+    else                     anim.press_alpha = 0.0f;
+
+    const float effect_alpha = ImMax(anim.hover_alpha * 0.30f, anim.press_alpha * 0.50f);
+    const float base_alpha   = dark_key ? 0.70f : 0.50f;
+    const float fill_alpha   = ImClamp(base_alpha + effect_alpha, 0.0f, 1.0f) * ui_alpha;
+    const ImU32 fill_col = dark_key
+        ? ImColor(60, 60, 60,   (int)(255.0f * fill_alpha))
+        : ImColor(100, 100, 100,(int)(255.0f * fill_alpha));
+
+    const float rounding = 13.0f;
+    draw->AddRectFilled(rect_min, rect_max, fill_col, rounding);
+
+    const ImVec2 text_size = ImGui::CalcTextSize(label);
+    const float rect_w = rect_max.x - rect_min.x;
+    const float rect_h = rect_max.y - rect_min.y;
+    const ImVec2 text_pos(
+        rect_min.x + (rect_w - text_size.x) * 0.5f,
+        rect_min.y + (rect_h - text_size.y) * 0.5f
+    );
+    draw->AddText(text_pos, ImColor(255, 255, 255, (int)(255.0f * ui_alpha)), label);
+
+    return clicked;
+}
+
+} // namespace keyboard_ui
+
+// Renders as a sliding panel ANCHORED AT THE BOTTOM of the SCREEN.
+// `id` must be unique per keyboard instance; `showKeyboard` is a toggle owned
+// by the caller. `searchQuery` is the char[] the keys append/backspace on.
+inline void RenderVirtualKeyboard(const char* id, char* searchQuery, size_t querySize, bool* showKeyboard)
+{
+    if (id == nullptr || searchQuery == nullptr || querySize == 0 || showKeyboard == nullptr) return;
+
+    const std::string keyboard_id(id);
+    KeyboardState& kb_state = g_kbStates[keyboard_id];
+    const float now = (float)ImGui::GetTime();
+
+    const bool stale_hidden = (now - kb_state.last_frame_time) > 0.25f;
+    if (*showKeyboard && (!kb_state.is_visible || stale_hidden)) {
+        kb_state.is_visible     = true;
+        kb_state.show_time      = now;
+        kb_state.allow_clicks   = false;
+        kb_state.open_progress  = 0.0f;
+        kb_state.last_frame_time= now;
+    } else if (!*showKeyboard) {
+        kb_state.is_visible    = false;
+        kb_state.open_progress = 0.0f;
+        kb_state.allow_clicks  = false;
+        return;
+    }
+    if (!kb_state.is_visible) return;
+
+    const float dt = keyboard_ui::ComputeDeltaTime(now, kb_state.last_frame_time);
+    kb_state.open_progress += (1.0f - kb_state.open_progress) * (8.0f * dt);
+    if (kb_state.open_progress > 0.995f) kb_state.open_progress = 1.0f;
+    if ((now - kb_state.show_time) > 0.10f) kb_state.allow_clicks = true;
+
+    const float ease           = keyboard_ui::EaseOutSmoothstep(kb_state.open_progress);
+    const float slide_offset_y = (1.0f - ease) * 34.0f;
+    const float ui_alpha       = ease;
+
+    ImGuiIO& io = ImGui::GetIO();
+    const float screen_w = io.DisplaySize.x;
+    const float screen_h = io.DisplaySize.y;
+    const float keyboard_h = screen_h * 0.42f; // slightly shorter so it doesn't cover full list
+
+    ImGui::SetNextWindowPos(ImVec2(0.0f, screen_h - keyboard_h), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(screen_w, keyboard_h), ImGuiCond_Always);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding,   13.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,    ImVec2(24.0f, 18.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg,
+        ImVec4(18.0f/255.0f, 18.0f/255.0f, 20.0f/255.0f, (230.0f/255.0f) * ui_alpha));
+
+    ImGui::Begin(id, nullptr,
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float content_w = ImGui::GetContentRegionAvail().x;
+    const float content_h = ImGui::GetContentRegionAvail().y;
+
+    const float key_spacing_x = 8.0f;
+    const float key_spacing_y = 10.0f;
+    const int   row_count     = 5;
+    const float key_w         = (content_w - key_spacing_x * 9.0f) / 10.0f;
+    const float max_key_h     = 60.0f;
+    const float min_key_h     = 34.0f;
+    const float auto_key_h    = (content_h - key_spacing_y * (row_count - 1)) / row_count;
+    const float key_h         = ImClamp(auto_key_h, min_key_h, max_key_h);
+    const float bottom_key_h  = key_h;
+
+    auto row_start_x = [&](int key_count, float key_width) -> float {
+        const float total_w = key_count * key_width + (key_count - 1) * key_spacing_x;
+        return origin.x + (content_w - total_w) * 0.5f;
+    };
+    auto draw_char_row = [&](const char* row_chars, float y) -> float {
+        const int count = (int)std::strlen(row_chars);
+        const float start_x = row_start_x(count, key_w);
+        for (int i = 0; i < count; ++i) {
+            const char ch[2] = { row_chars[i], '\0' };
+            const float x = start_x + i * (key_w + key_spacing_x);
+            const ImVec2 rect_min(x, y + slide_offset_y);
+            const ImVec2 rect_max(x + key_w, y + key_h + slide_offset_y);
+            const std::string full_id = keyboard_id + "_" + ch;
+            if (keyboard_ui::DrawKeyButton(draw, full_id, ch, rect_min, rect_max, kb_state.allow_clicks, now, dt, ui_alpha, false)) {
+                keyboard_ui::AppendText(searchQuery, querySize, ch);
+            }
+        }
+        return y + key_h + key_spacing_y;
+    };
+
+    float y = origin.y;
+    y = draw_char_row("1234567890", y);
+    y = draw_char_row("QWERTYUIOP", y);
+    y = draw_char_row("ASDFGHJKL",  y);
+
+    // Row 4: MYTHIC  Z X C V B N M  del
+    {
+        const float start_x = row_start_x(9, key_w);
+        const char* letters = "ZXCVBNM";
+
+        const ImVec2 m_min(start_x, y + slide_offset_y);
+        const ImVec2 m_max(start_x + key_w, y + key_h + slide_offset_y);
+        if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_MYTHIC", "MYTHIC", m_min, m_max, kb_state.allow_clicks, now, dt, ui_alpha, true))
+            keyboard_ui::AppendText(searchQuery, querySize, "MYTHIC");
+
+        for (int i = 0; i < 7; ++i) {
+            char ch[2] = { letters[i], '\0' };
+            const float x = start_x + (i + 1) * (key_w + key_spacing_x);
+            const ImVec2 rect_min(x, y + slide_offset_y);
+            const ImVec2 rect_max(x + key_w, y + key_h + slide_offset_y);
+            if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_" + ch, ch, rect_min, rect_max, kb_state.allow_clicks, now, dt, ui_alpha, false))
+                keyboard_ui::AppendText(searchQuery, querySize, ch);
+        }
+
+        const float del_x = start_x + 8 * (key_w + key_spacing_x);
+        const ImVec2 del_min(del_x, y + slide_offset_y);
+        const ImVec2 del_max(del_x + key_w, y + key_h + slide_offset_y);
+        if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_del", "del", del_min, del_max, kb_state.allow_clicks, now, dt, ui_alpha, true))
+            keyboard_ui::Backspace(searchQuery, querySize);
+
+        y += key_h + key_spacing_y;
+    }
+
+    // Row 5: LEGENDARY   EPIC    space    Clear
+    {
+        const float side_w  = key_w;
+        const float space_w = key_w * 5.5f + key_spacing_x * 4.5f;
+        const float total_w = side_w + key_spacing_x + side_w + key_spacing_x + space_w + key_spacing_x + side_w;
+        const float start_x = origin.x + (content_w - total_w) * 0.5f;
+
+        const ImVec2 l_min(start_x, y + slide_offset_y);
+        const ImVec2 l_max(start_x + side_w, y + bottom_key_h + slide_offset_y);
+        if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_LEGEND", "LEGENDARY", l_min, l_max, kb_state.allow_clicks, now, dt, ui_alpha, true))
+            keyboard_ui::AppendText(searchQuery, querySize, "LEGENDARY");
+
+        const float e_x = start_x + side_w + key_spacing_x;
+        const ImVec2 e_min(e_x, y + slide_offset_y);
+        const ImVec2 e_max(e_x + side_w, y + bottom_key_h + slide_offset_y);
+        if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_EPIC", "EPIC", e_min, e_max, kb_state.allow_clicks, now, dt, ui_alpha, true))
+            keyboard_ui::AppendText(searchQuery, querySize, "EPIC");
+
+        const float space_x = e_x + side_w + key_spacing_x;
+        const ImVec2 space_min(space_x, y + slide_offset_y);
+        const ImVec2 space_max(space_x + space_w, y + bottom_key_h + slide_offset_y);
+        if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_space", "space", space_min, space_max, kb_state.allow_clicks, now, dt, ui_alpha, false))
+            keyboard_ui::AppendText(searchQuery, querySize, " ");
+
+        const float clear_x = space_x + space_w + key_spacing_x;
+        const ImVec2 clear_min(clear_x, y + slide_offset_y);
+        const ImVec2 clear_max(clear_x + side_w, y + bottom_key_h + slide_offset_y);
+        if (keyboard_ui::DrawKeyButton(draw, keyboard_id + "_clear", "Clear", clear_min, clear_max, kb_state.allow_clicks, now, dt, ui_alpha, true))
+            searchQuery[0] = '\0';
+    }
+
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(3);
+}
+
+
+static void CheckTopCenterMenuRestore()
+{
+    if (isMenuVisible)
+    {
+        return;
+    }
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.MouseClicked[0])
+    {
+        float screenWidth = get_width();
+        float areaWidth = 200.0f;
+        float areaHeight = 50.0f;
+        float minX = (screenWidth * 0.5f) - (areaWidth * 0.5f);
+        float maxX = (screenWidth * 0.5f) + (areaWidth * 0.5f);
+
+        if (io.MousePos.x >= minX && io.MousePos.x <= maxX && io.MousePos.y >= 0.0f && io.MousePos.y <= areaHeight)
+        {
+            isMenuVisible = true;
+            windowCollapsed = false;
+        }
+    }
+}
+
+#define CREATE_COLOR(r, g, b, a) new float[4]{r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f};
+
+int TABG = 1;
+
+struct TextureInfo
+{
+    ImTextureID textureId;
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
+TextureInfo mPlayersOn;
+TextureInfo mPlayersOff;
+TextureInfo mWorldOn;
+TextureInfo mWorldOff;
+TextureInfo mRageBotOn;
+TextureInfo mRageBotOff;
+TextureInfo mScriptsOn;
+TextureInfo mScriptsOff;
+TextureInfo mSettingsOn;
+TextureInfo mSettingsOff;
+TextureInfo DOT;
+TextureInfo Logo;
+
+TextureInfo CreateTexture(const unsigned char *buf, int len)
+{
+    TextureInfo image;
+    unsigned char *image_data = stbi_load_from_memory(buf, len, &image.w, &image.h, NULL, 0);
+    if (image_data == NULL)
+    {
+        perror("File does not exist");
+    }
+    GLuint image_texture;
+    glGenTextures(1, &image_texture);
+    glBindTexture(GL_TEXTURE_2D, image_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    #if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    #endif
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.w, image.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
+    stbi_image_free(image_data);
+    image.textureId = (ImTextureID)image_texture;
+    return image;
+}
+
+void InitTexture()
+{
+    Logo = CreateTexture(Logo_data, sizeof(Logo_data));
+    mPlayersOn = CreateTexture(PlayersOn, sizeof(PlayersOn));
+    mPlayersOff = CreateTexture(PlayersOff, sizeof(PlayersOff));
+    mWorldOn = CreateTexture(WorldOn, sizeof(WorldOn));
+    mWorldOff = CreateTexture(WorldOff, sizeof(WorldOff));
+    mRageBotOn = CreateTexture(RageBotOn, sizeof(RageBotOn));
+    mRageBotOff = CreateTexture(RageBotOff, sizeof(RageBotOff));
+    mScriptsOn = CreateTexture(ScriptsOn, sizeof(ScriptsOn));
+    mScriptsOff = CreateTexture(ScriptsOff, sizeof(ScriptsOff));
+    mSettingsOn = CreateTexture(SettingsOn, sizeof(SettingsOn));
+    mSettingsOff = CreateTexture(SettingsOff, sizeof(SettingsOff));
+    DOT = CreateTexture(DOT_data, sizeof(DOT_data));
+}
+
+
+// ================================================================================================
+// OPTIONAL: TOP-LEFT FPS (same style as your previous "like that" black look)
+// ================================================================================================
+static void RenderTopLeftFPS(ImDrawList* draw)
+{
+    if (!draw) return;
+
+    ImFont* font = ImGui::GetFont();
+    float fps = ImGui::GetIO().Framerate;
+
+    const float x = 50.0f;
+    const float y = 60.0f;
+    const float fs = 30.0f;
+
+    ImU32 fpsCol =
+        (fps >= 60.0f) ? IM_COL32(110, 255, 170, 255) :
+        (fps >= 30.0f) ? IM_COL32(255, 215,  80, 255) :
+        (fps >=  1.0f) ? IM_COL32(255,  90,  90, 255) :
+                         IM_COL32(160, 160, 160, 200);
+
+    char txt[32];
+    std::snprintf(txt, sizeof(txt), "FPS : %d", (int)(fps + 0.5f));
+
+    draw->AddText(font, fs, ImVec2(x + 1.5f, y + 1.5f), IM_COL32(0, 0, 0, 170), txt);
+    draw->AddText(font, fs, ImVec2(x, y), fpsCol, txt);
+}
+
+// ================================================================================================
+// YOUR RenderFloatingInfo (DARK BLACK PRO THEME)
+// ================================================================================================
+void RenderFloatingInfo(ImDrawList* draw, float screenWidth, float screenHeight)
+{
+    if (!draw) return;
+    if (Config.ExtraMenu.ClearDisplay) return;
+
+    // Optional FPS like your previous black version
+    RenderTopLeftFPS(draw);
+
+    // ===== TIME / DATE =====
+    auto now = std::chrono::system_clock::now();
+    std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+    std::tm* localTime = std::localtime(&currentTime);
+
+    char dateStr[48], timeStr[32];
+    strftime(dateStr, sizeof(dateStr), "%d %b %Y", localTime);
+    strftime(timeStr, sizeof(timeStr), "%I:%M:%S %p", localTime);
+
+    // ===== UPTIME =====
+    auto currentDuration = std::chrono::steady_clock::now() - appStartTime;
+    std::string playTime = FormatTimeDuration(currentDuration);
+
+    // ===== CONTENT =====
+    const char* subText   = "SUBSCRIPTION : PREMIUM";
+    const char* titleText = "CODM GARENA | 1.6.55";
+    const char* tgText    = "TELEGRAM : @Feylric";
+    const char* warnText  = "PLAY SAFE TO AVOID BAN";
+
+    char lineDate[80], lineTime[80], lineUp[96];
+    std::snprintf(lineDate, sizeof(lineDate), "DATE : %s", dateStr);
+    std::snprintf(lineTime, sizeof(lineTime), "TIME : %s", timeStr);
+    std::snprintf(lineUp,   sizeof(lineUp),   "UPTIME : %s", playTime.c_str());
+
+    // ===== THEME (DARK BLACK PRO) =====
+    // Clean black glass + subtle border + minimal accent
+    const ImU32 colShadow   = IM_COL32(0, 0, 0, 150);
+    const ImU32 colPanel    = IM_COL32(10, 10, 12, 235);      // near-black
+    const ImU32 colBorder   = IM_COL32(255, 255, 255, 30);    // subtle white
+    const ImU32 colDivider  = IM_COL32(255, 255, 255, 18);
+    const ImU32 colAccent   = IM_COL32(255, 255, 255, 40);    // minimal bar
+    const ImU32 colMuted    = IM_COL32(190, 195, 205, 200);
+    const ImU32 colGreen    = IM_COL32(110, 255, 170, 255);   // keep premium green
+    const ImU32 colDot      = IM_COL32(110, 255, 170, 230);
+
+    // Warning pulse
+    float tNow = (float)ImGui::GetTime();
+    float pulse = 0.5f + 0.5f * sinf(tNow * 3.0f);
+    ImU32 colWarn = IM_COL32(255, (int)(95 + pulse * 75), (int)(95 + pulse * 75), 255);
+
+    // ===== FONT / SIZES =====
+    ImFont* font = ImGui::GetFont();
+    const float fsTitle = 18.5f;
+    const float fsSub   = 16.0f;
+    const float fsInfo  = 15.2f;
+    const float fsWarn  = 16.0f;
+
+    // ===== WIDTH AUTO FIT =====
+    auto TextW = [&](const char* s, float sz) -> float {
+        return font->CalcTextSizeA(sz, FLT_MAX, 0.0f, s).x;
+    };
+
+    float maxW = 0.0f;
+    maxW = ImMax(maxW, TextW(titleText, fsTitle));
+    maxW = ImMax(maxW, TextW(subText,   fsSub));
+    maxW = ImMax(maxW, TextW(lineDate,  fsInfo));
+    maxW = ImMax(maxW, TextW(lineTime,  fsInfo));
+    maxW = ImMax(maxW, TextW(lineUp,    fsInfo));
+    maxW = ImMax(maxW, TextW(tgText,    fsInfo));
+    maxW = ImMax(maxW, TextW(warnText,  fsWarn));
+
+    float paddingX = 18.0f;
+    float paddingY = 16.0f;
+    float lineH    = 22.0f;
+    float boxW     = maxW + paddingX * 2.0f + 6.0f;
+    float boxH     = paddingY * 2.0f + lineH * 6.0f + 12.0f;
+
+    float margin   = 22.0f;
+    float x0       = margin;
+    float y0       = screenHeight - margin - boxH;
+    float rounding = 14.0f;
+
+    // ===== PANEL =====
+    draw->AddRectFilled(ImVec2(x0 + 3.0f, y0 + 4.0f),
+                        ImVec2(x0 + boxW + 3.0f, y0 + boxH + 4.0f),
+                        colShadow, rounding);
+
+    draw->AddRectFilled(ImVec2(x0, y0),
+                        ImVec2(x0 + boxW, y0 + boxH),
+                        colPanel, rounding);
+
+    draw->AddRect(ImVec2(x0, y0),
+                  ImVec2(x0 + boxW, y0 + boxH),
+                  colBorder, rounding, 0, 1.5f);
+
+    // Accent bar
+    draw->AddRectFilled(ImVec2(x0, y0),
+                        ImVec2(x0 + 4.0f, y0 + boxH),
+                        colAccent, rounding, ImDrawFlags_RoundCornersLeft);
+
+    // Divider
+    draw->AddLine(ImVec2(x0 + 12.0f, y0 + paddingY + lineH + 4.0f),
+                  ImVec2(x0 + boxW - 12.0f, y0 + paddingY + lineH + 4.0f),
+                  colDivider, 1.0f);
+
+    // Status dot
+    draw->AddCircleFilled(ImVec2(x0 + boxW - 18.0f, y0 + 18.0f), 4.0f, colDot);
+
+    // ===== TEXT =====
+    float x = x0 + paddingX;
+    float y = y0 + paddingY;
+
+    // ===== RAINBOW TITLE (TONED DOWN FOR BLACK THEME) =====
+    {
+        float t = (float)ImGui::GetTime() * 0.6f;
+
+        float r = sinf(t) * 0.5f + 0.5f;
+        float g = sinf(t + 2.094f) * 0.5f + 0.5f;
+        float b = sinf(t + 4.188f) * 0.5f + 0.5f;
+
+        // keep it premium (closer to white)
+        ImU32 rainbowCol = ImColor(
+            r * 0.25f + 0.75f,
+            g * 0.25f + 0.75f,
+            b * 0.25f + 0.75f,
+            1.0f
+        );
+
+        draw->AddText(font, fsTitle, ImVec2(x + 1.2f, y + 1.2f), IM_COL32(0, 0, 0, 170), titleText);
+        draw->AddText(font, fsTitle, ImVec2(x, y), rainbowCol, titleText);
+    }
+
+    y += lineH + 8.0f;
+
+    draw->AddText(font, fsSub,  ImVec2(x, y), colGreen, subText);  y += lineH;
+    draw->AddText(font, fsInfo, ImVec2(x, y), colMuted, lineDate); y += lineH;
+    draw->AddText(font, fsInfo, ImVec2(x, y), colMuted, lineTime); y += lineH;
+    draw->AddText(font, fsInfo, ImVec2(x, y), colMuted, lineUp);   y += lineH;
+    draw->AddText(font, fsInfo, ImVec2(x, y), colMuted, tgText);   y += lineH;
+    draw->AddText(font, fsWarn, ImVec2(x, y), colWarn,  warnText);
+}
+
+
+EGLBoolean (*old_eglSwapBuffers)(EGLDisplay dpy, EGLSurface surface);
+EGLBoolean hook_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface)
+{
+    if (!Config.ImGuiMenu.g_Initialized)
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO &io = ImGui::GetIO();
+        ImGuiStyle &style = ImGui::GetStyle();
+
+        style.WindowPadding = ImVec2(0, 0);
+        style.WindowRounding = 0.0f;
+        style.Colors[ImGuiCol_WindowBg] = ImColor(255, 255, 255, 0);
+        style.Colors[ImGuiCol_Text] = ImColor(255, 255, 255, 255);
+        style.ItemInnerSpacing = ImVec2(9, 9);
+        style.WindowBorderSize = 0.0f;
+
+        ImGui_ImplAndroid_Init();
+        ImGui_ImplOpenGL3_Init("#version 300 es");
+        io.ConfigWindowsMoveFromTitleBarOnly = true;
+        io.IniFilename = NULL;
+
+        static const ImWchar icons_ranges[] = {
+            0x0020, 0x00FF, 0x3000, 0x30FF, 0x31F0, 0x31FF, 0xFF00, 0xFFEF, 0x4e00, 0x9FAF, 0xf000, 0xf3ff, 0xe000, 0xf8ff, 0};
+
+        ImFontConfig CustomFont;
+        CustomFont.FontDataOwnedByAtlas = false;
+        ImFontConfig icons_config;
+
+        icons_config.MergeMode = true;
+        icons_config.PixelSnapH = true;
+        icons_config.OversampleH = 2.5;
+        icons_config.OversampleV = 2.5;
+
+        io.Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t *>(Custom), sizeof(Custom), 22.f, &CustomFont);
+        F48 = io.Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t *>(Custom), sizeof(Custom), 25.0f, &CustomFont);
+        F50 = io.Fonts->AddFontFromMemoryTTF(const_cast<std::uint8_t *>(Custom), sizeof(Custom), 30.0f, &CustomFont);
+        JAAT = io.Fonts->AddFontFromMemoryTTF((void *)Chi_data, Chi_size, 25.0f, NULL, io.Fonts->GetGlyphRangesDefault());
+        SOCIAL = io.Fonts->AddFontFromMemoryTTF((void *)F87_data, F87_size, 30.0f, NULL, io.Fonts->GetGlyphRangesDefault());
+
+        ImGui::GetStyle().ScaleAllSizes(3.0f);
+        memset(&Config, 0, sizeof(sConfig));
+
+        Config.sColorsESPPLAYER.LinePLAYER = CREATE_COLOR(255, 0, 0, 255);
+        Config.sColorsESPPLAYER.BoxPLAYER = CREATE_COLOR(255, 0, 0, 255);
+        Config.sColorsESPPLAYER.NamePLAYER = CREATE_COLOR(255, 0, 0, 255);
+        Config.sColorsESPPLAYER.DistancePLAYER = CREATE_COLOR(255, 0, 0, 255);
+        Config.sColorsESPPLAYER.HealthPLAYER = CREATE_COLOR(255, 0, 0, 255);
+        Config.sColorsESPBOT.LineBOT = CREATE_COLOR(0, 255, 0, 180);
+        Config.sColorsESPBOT.BoxBOT = CREATE_COLOR(0, 255, 0, 180);
+        Config.sColorsESPBOT.NameBOT = CREATE_COLOR(0, 255, 0, 180);
+        Config.sColorsESPBOT.HealthBOT = CREATE_COLOR(0, 255, 0, 180);
+        Config.sColorsESPBOT.DistanceBOT = CREATE_COLOR(0, 255, 0, 180);
+        Config.sColorsESPOTHERS.PovOTHERS = CREATE_COLOR(225, 0, 0, 180);
+        Config.sColorsESPPLAYER.SkeletonPLAYER = CREATE_COLOR(255, 0, 0, 255);
+        Config.sColorsESPBOT.SkeletonBOT = CREATE_COLOR(0, 255, 0, 180);
+
+        Config.PskelLine = 2.0f;
+        Config.BskelLine = 2.0f;
+        Config.ESPMenu.Skeleton = false;
+
+        Config.Bline = 2.0f;
+        Config.Bbox = 2.0f;
+        Config.Pline = 2.0f;
+        Config.Pbox = 2.0f;
+
+        InitTexture();
+        Config.ImGuiMenu.g_Initialized = true;
+        TryAutoLogin(logintext, sizeof(logintext), err, isLogin, Login);
+    }
+    ImGuiIO *io = &ImGui::GetIO();
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplAndroid_NewFrame(get_width(), get_height());
+    ImGui::NewFrame();
+    DrawESP(ImGui::GetBackgroundDrawList(), get_width(), get_height(), get_dpi());
+    RenderFloatingInfo(ImGui::GetBackgroundDrawList(), get_width(), get_height());
+
+    CheckTopCenterMenuRestore();
+
+    if (windowCollapsed)
+    {
+        static ImVec2 collapsedLogoPos = ImVec2(-1, -1);
+        static bool collapsedPosInitialized = false;
+        static bool wasDragging = false;
+        ImVec2 logoWindowSize = ImVec2(180, 180);
+
+        if (!collapsedPosInitialized)
+        {
+            ImVec2 vp = ImGui::GetMainViewport()->Pos;
+            collapsedLogoPos = ImVec2(vp.x + 10, vp.y + 10);
+            collapsedPosInitialized = true;
+        }
+
+        ImGui::SetNextWindowPos(collapsedLogoPos, ImGuiCond_Always);
+ImGui::SetNextWindowSize(logoWindowSize, ImGuiCond_Always);
+
+// Fully transparent window background
+ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+// Optional: transparent border (or remove entirely)
+ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+
+ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f);
+
+
+        bool restoreMenu = false;
+
+        if (ImGui::Begin("MENU_COLLAPSED", nullptr,
+                         ImGuiWindowFlags_NoTitleBar |
+                         ImGuiWindowFlags_NoResize |
+                         ImGuiWindowFlags_NoScrollbar |
+                         ImGuiWindowFlags_NoCollapse |
+                         ImGuiWindowFlags_NoBringToFrontOnFocus |
+                         ImGuiWindowFlags_NoSavedSettings))
+        {
+            if (!astralLoaded)
+            {
+                astralTextureID = LoadAstralTexture(astral_data, sizeof(astral_data));
+            }
+
+            ImVec2 winSize = ImGui::GetWindowSize();
+            ImGui::SetCursorPos(ImVec2(0, 0));
+            ImGui::InvisibleButton("", winSize, ImGuiButtonFlags_MouseButtonLeft);
+
+            if (ImGui::IsItemActive() && ImGui::IsMouseDragging(0))
+            {
+                ImVec2 delta = ImGui::GetIO().MouseDelta;
+                collapsedLogoPos.x += delta.x;
+                collapsedLogoPos.y += delta.y;
+                wasDragging = true;
+            }
+
+            if (ImGui::IsItemDeactivated())
+            {
+                if (!wasDragging && windowCollapsed)
+                {
+                    restoreMenu = true;
+                }
+                wasDragging = false;
+            }
+
+            if (astralLoaded && astralTextureID)
+            {
+                float logoOpacity = GetLogoOpacity();
+                float logoSizeMultiplier = GetLogoSizeMultiplier();
+                float baseSize = 90.0f;
+                float size = baseSize * logoSizeMultiplier;
+
+                float logoX = (logoWindowSize.x - size) / 2.0f;
+                float logoY = (logoWindowSize.y - size) / 2.0f;
+
+                ImVec2 windowPos = ImGui::GetWindowPos();
+                ImVec2 clipMin = windowPos;
+                ImVec2 clipMax = ImVec2(windowPos.x + logoWindowSize.x, windowPos.y + logoWindowSize.y);
+
+                ImGui::PushClipRect(clipMin, clipMax, true);
+
+                ImGui::SetCursorPos(ImVec2(logoX, logoY));
+                ImVec4 tintColor = ImVec4(1.0f, 1.0f, 1.0f, logoOpacity);
+                ImGui::Image((void *)(intptr_t)astralTextureID, ImVec2(size, size), ImVec2(0, 0), ImVec2(1, 1), tintColor);
+
+                ImGui::PopClipRect();
+
+                if (Config.ExtraMenu.ShowFPS)
+{
+    float fps = ImGui::GetIO().Framerate;
+    char fpsText[32];
+    snprintf(fpsText, sizeof(fpsText), "%.0f FPS", fps);
+
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+
+    // ===== Box dimensions =====
+    float fpsBoxWidth = 90.0f;
+    float fpsBoxHeight = 35.0f;
+    float fpsBoxX = windowPos.x + logoWindowSize.x - fpsBoxWidth - 10.0f;
+    float fpsBoxY = windowPos.y + 10.0f;
+
+    // ===== Background box =====
+    draw->AddRectFilled(
+        ImVec2(fpsBoxX, fpsBoxY),
+        ImVec2(fpsBoxX + fpsBoxWidth, fpsBoxY + fpsBoxHeight),
+        ImColor(100, 120, 130, 200),
+        17.5f
+    );
+
+    // ===== Optional border =====
+    draw->AddRect(
+        ImVec2(fpsBoxX, fpsBoxY),
+        ImVec2(fpsBoxX + fpsBoxWidth, fpsBoxY + fpsBoxHeight),
+        ImColor(255, 255, 255, 100),
+        17.5f,
+        ImDrawFlags_RoundCornersAll,
+        2.0f
+    );
+
+    // ===== Determine FPS color =====
+    ImU32 fpsColor;
+    if (fps < 30.0f)
+        fpsColor = IM_COL32(255, 0, 0, 255);    // red
+    else if (fps < 60.0f)
+        fpsColor = IM_COL32(255, 255, 0, 255);  // yellow
+    else
+        fpsColor = IM_COL32(0, 255, 0, 255);    // green
+
+    // ===== FPS text =====
+    if (F50) // make sure F50 is a valid ImFont*
+    {
+        ImVec2 textSize = F50->CalcTextSizeA(25.0f, FLT_MAX, 0.0f, fpsText);
+        float textX = fpsBoxX + (fpsBoxWidth - textSize.x) / 2.0f;
+        float textY = fpsBoxY + (fpsBoxHeight - textSize.y) / 2.0f;
+
+        // Shadow for readability
+        draw->AddText(F50, 25.0f, ImVec2(textX - 1, textY - 1), IM_COL32(0, 0, 0, 200), fpsText);
+        draw->AddText(F50, 25.0f, ImVec2(textX + 1, textY - 1), IM_COL32(0, 0, 0, 200), fpsText);
+        draw->AddText(F50, 25.0f, ImVec2(textX - 1, textY + 1), IM_COL32(0, 0, 0, 200), fpsText);
+        draw->AddText(F50, 25.0f, ImVec2(textX + 1, textY + 1), IM_COL32(0, 0, 0, 200), fpsText);
+
+        // Colored FPS text
+        draw->AddText(F50, 25.0f, ImVec2(textX, textY), fpsColor, fpsText);
+    }
+}
+
+
+            }
+        }
+        ImGui::End();
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
+
+        if (restoreMenu)
+        {
+            windowCollapsed = false;
+            isMenuVisible = true;
+        }
+    }
+
+    if (isMenuVisible && !windowCollapsed)
+    {
+        if (!isLogin)
+        {
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(500, 530), ImGuiCond_Always);
+
+            if (ImGui::Begin("Login Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove))
+            {
+                const ImVec2 pos = ImGui::GetWindowPos();
+                ImDrawList *draw = ImGui::GetWindowDrawList();
+
+                draw->AddRectFilled(ImVec2(pos.x + 0, pos.y + 0), ImVec2(pos.x + 500, pos.y + 530), ImColor(0, 0, 0, 255), 5.f, ImDrawFlags_RoundCornersAll);
+                draw->AddRectFilled(ImVec2(pos.x + 10, pos.y + 10), ImVec2(pos.x + 490, pos.y + 520), ImColor(50, 50, 50, 255), 8.f, ImDrawFlags_RoundCornersAll);
+                draw->AddRectFilled(ImVec2(pos.x + 30, pos.y + 150), ImVec2(pos.x + 470, pos.y + 210), ImColor(0, 0, 0, 255), 10.f, ImDrawFlags_RoundCornersAll);
+                draw->AddLine(ImVec2(pos.x + 30, pos.y + 408), ImVec2(pos.x + 470, pos.y + 408), ImColor(0, 0, 0, 255), 5.f);
+
+                const char* titleText = "SINGULARITY";
+                ImVec2 titleSize = F50->CalcTextSizeA(40.f, FLT_MAX, 0.0f, titleText);
+                float titleX = pos.x + (500 - titleSize.x) / 2;
+                draw->AddText(F50, 40.f, ImVec2(titleX, pos.y + 60), ImColor(255, 255, 255, 255), titleText);
+                draw->AddText(NULL, 20.f, ImVec2(pos.x + 165, pos.y + 430), ImColor(255, 255, 255, 255 / 2), "Contact us through");
+                draw->AddText(SOCIAL, 30.f, ImVec2(pos.x + 250 - 15 - 50 - 30, pos.y + 470), ImColor(255, 255, 255, 255 / 2), "V");
+                draw->AddText(SOCIAL, 30.f, ImVec2(pos.x + 250 - 15, pos.y + 470), ImColor(255, 255, 255, 255 / 2), "W");
+                draw->AddText(SOCIAL, 30.f, ImVec2(pos.x + 250 + 15 + 50, pos.y + 470), ImColor(255, 255, 255, 255 / 2), "F");
+
+                ImGui::SetCursorPos(ImVec2(250 - 15 - 50 - 30 - 20, 450));
+                if (ImGui::OptButton("", ImVec2(70, 70), false))
+                {
+                }
+
+                ImGui::SetCursorPos(ImVec2(250 - 15 - 20, 450));
+                if (ImGui::OptButton("", ImVec2(70, 70), false))
+                {
+                }
+
+                ImGui::SetCursorPos(ImVec2(250 + 15 + 50 - 20, 450));
+                if (ImGui::OptButton("", ImVec2(70, 70), false))
+                {
+                }
+
+                ImGui::SetCursorPos(ImVec2(70, 164));
+                ImGui::InputTextWithHint("", "", logintext, sizeof(logintext));
+
+                ImGui::SetCursorPos(ImVec2(30, 225));
+                if (ImGui::OptButton1("       PASTE YOUR KEY   ", ImVec2(440, 60), false))
+                {
+                    auto key = getClipboard();
+                    strncpy(logintext, key.c_str(), sizeof(logintext));
+                }
+
+                ImGui::SetCursorPos(ImVec2(100, 305));
+                if (ImGui::OptButton1(" LOGIN", ImVec2(300, 60), false))
+                {
+                    err = Login(logintext);
+                    if (err == "OK")
+                    {
+                        isLogin = true;
+                        SaveLoginTextToFile(logintext);
+                    }
+                }
+
+                if (!err.empty() && err != "OK")
+                {
+                    ImGui::SetCursorPos(ImVec2(40, 375));
+                    ImGui::Text("Error: %s", err.c_str());
+                }
+            }
+            ImGui::End();
+        }
+        else
+        {
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(850, 600), ImGuiCond_Always);
+
+            if (ImGui::Begin("SovereignAstral", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove))
+            {
+                const ImVec2 pos = ImGui::GetWindowPos();
+                ImDrawList *draw = ImGui::GetWindowDrawList();
+
+                draw->AddRectFilled(ImVec2(0 + pos.x, 0 + pos.y), ImVec2(850 + pos.x, 600 + pos.y), ImColor(12, 12, 12, 80), 25.0f, ImDrawFlags_RoundCornersAll);
+
+                float headerY = pos.y + 10;
+                float headerHeight = 85;
+                float headerStartX = pos.x + 10;
+
+                float header1X = headerStartX;
+                float header1Width = 250.0f;
+
+                float header2X = header1X + header1Width + 10.0f;
+                float header2Width = 315.0f;
+
+                float header3X = header2X + header2Width + 10.0f;
+                float header3Width = 90.0f;
+
+                float header4X = header3X + header3Width + 10.0f;
+                float header4Width = 147.0f;
+
+                ImColor headerBgColor = ImColor(12, 12, 12, 150);
+                float headerRadius = 20.0f;
+
+                draw->AddRectFilled(ImVec2(header1X, headerY), ImVec2(header1X + header1Width, headerY + headerHeight), headerBgColor, headerRadius, ImDrawFlags_RoundCornersAll);
+                float logoSize = 60.0f;
+                float logoPadding = (headerHeight - logoSize) / 2.0f;
+                draw->AddImageRounded(DOT.textureId, ImVec2(header1X + logoPadding, headerY + logoPadding), ImVec2(header1X + logoPadding + logoSize, headerY + logoPadding + logoSize), ImVec2(0, 0), ImVec2(1, 1), ImColor(255, 255, 255, 255), 8.0f, ImDrawFlags_RoundCornersAll);
+                if (F50)
+                {
+                    const char* versionText = "SINGULARITY";
+                    float textX = header1X + logoPadding + logoSize + 16.0f;
+                    float textY = headerY + (headerHeight / 2.0f) - 10.0f;
+                    draw->AddText(F50, 22.0f, ImVec2(textX, textY), ImColor(255, 255, 255, 255), versionText);
+                }
+
+                draw->AddRectFilled(ImVec2(header2X, headerY), ImVec2(header2X + header2Width, headerY + headerHeight), headerBgColor, headerRadius, ImDrawFlags_RoundCornersAll);
+                float iconSize = 75.0f;
+                float iconPadding = (headerHeight - iconSize) / 2.0f;
+                ImTextureID currentIcon = mPlayersOff.textureId;
+                const char* currentTabName = "Visual";
+                const char* currentTabDesc = "See Enemy Through Walls";
+                if (TABG == 1)
+                {
+                    currentIcon = mPlayersOff.textureId;
+                    currentTabName = "Visuals";
+                    currentTabDesc = "See Enemy Through Walls";
+                }
+                else if (TABG == 2)
+                {
+                    currentIcon = mRageBotOff.textureId;
+                    currentTabName = "Combat";
+                    currentTabDesc = "Destroy everyone in your path";
+                }
+                else if (TABG == 3)
+                {
+                    currentIcon = mWorldOff.textureId;
+                    currentTabName = "Memory";
+                    currentTabDesc = "Control over the whole map";
+                }
+                else if (TABG == 4)
+                {
+                    currentIcon = mScriptsOff.textureId;
+                    currentTabName = "Skins";
+                    currentTabDesc = "Customize your weapons";
+                }
+                else if (TABG == 5)
+                {
+                    currentIcon = mSettingsOff.textureId;
+                    currentTabName = "Settings";
+                    currentTabDesc = "Change Theme and Menu Design";
+                }
+                draw->AddImageRounded(currentIcon, ImVec2(header2X + 10, headerY + iconPadding), ImVec2(header2X + 10 + iconSize, headerY + iconPadding + iconSize), ImVec2(0, 0), ImVec2(1, 1), ImColor(255, 255, 255, 255), 8.0f, ImDrawFlags_RoundCornersAll);
+                if (F50)
+                {
+                    float textX = header2X + 10 + iconSize + 12.0f;
+                    draw->AddText(F50, 24.0f, ImVec2(textX, headerY + 22), ImColor(255, 255, 255, 255), currentTabName);
+                    draw->AddText(F50, 13.0f, ImVec2(textX, headerY + 52), ImColor(255, 255, 255, 127), currentTabDesc);
+                }
+
+                draw->AddRectFilled(ImVec2(header3X, headerY), ImVec2(header3X + header3Width, headerY + headerHeight), headerBgColor, headerRadius, ImDrawFlags_RoundCornersAll);
+                if (F50)
+                {
+                    float fps = ImGui::GetIO().Framerate;
+                    char fpsText[32];
+                    snprintf(fpsText, sizeof(fpsText), "%.0f", fps);
+                    ImVec2 fpsSize = F50->CalcTextSizeA(32.0f, FLT_MAX, 0.0f, fpsText);
+                    float fpsX = header3X + (header3Width - fpsSize.x) / 2.0f;
+                    draw->AddText(F50, 32.0f, ImVec2(fpsX, headerY + 18), ImColor(255, 255, 255, 255), fpsText);
+                    const char* fpsLabel = "FPS";
+                    ImVec2 labelSize = F50->CalcTextSizeA(16.0f, FLT_MAX, 0.0f, fpsLabel);
+                    float labelX = header3X + (header3Width - labelSize.x) / 2.0f;
+                    draw->AddText(F50, 16.0f, ImVec2(labelX, headerY + 58), ImColor(255, 255, 255, 127), fpsLabel);
+                }
+
+                draw->AddRectFilled(ImVec2(header4X, headerY), ImVec2(header4X + header4Width, headerY + headerHeight), headerBgColor, headerRadius, ImDrawFlags_RoundCornersAll);
+
+                if (F50)
+                {
+                    const char* closeText = "Close";
+                    ImVec2 textSize = F50->CalcTextSizeA(24.0f, FLT_MAX, 0.0f, closeText);
+                    float textX = header4X + (header4Width - textSize.x) / 2.0f;
+                    float textY = headerY + (headerHeight - textSize.y) / 2.0f;
+                    draw->AddText(F50, 24.0f, ImVec2(textX, textY), ImColor(255, 255, 255, 255), closeText);
+                }
+
+                ImGui::SetCursorPos(ImVec2(header4X - pos.x, headerY - pos.y));
+                ImGui::InvisibleButton("", ImVec2(header4Width, headerHeight));
+                if (ImGui::IsItemClicked())
+                {
+                    isMenuVisible = false;
+                    windowCollapsed = false;
+                }
+
+                float sidebarX = pos.x + 10;
+                float sidebarY = pos.y + 105;
+                float sidebarWidth = 130;
+                float sidebarHeight = 485;
+
+                ImColor sidebarBgColor = ImColor(12, 12, 12, 150);
+                float sidebarRadius = 20.0f;
+
+                draw->AddRectFilled(
+                    ImVec2(sidebarX, sidebarY),
+                    ImVec2(sidebarX + sidebarWidth, sidebarY + sidebarHeight),
+                    sidebarBgColor,
+                    sidebarRadius,
+                    ImDrawFlags_RoundCornersAll
+                );
+
+                ImGui::SetCursorPos(ImVec2(10, 105));
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+                ImGui::BeginChild("OuterSidebar", ImVec2(sidebarWidth, sidebarHeight), false, ImGuiWindowFlags_NoScrollbar);
+                {
+                    ImVec2 outerChildPos = ImGui::GetCursorScreenPos();
+
+                    float buttonSpacing = 25.0f;
+                    float buttonHeight = 60.0f;
+                    float activeLineWidth = 5.0f;
+                    float activeLineHeight = 45.0f;
+                    float lineOffset = 4.0f;
+                    ImColor activeLineColor = ImColor(menu[0], menu[1], menu[2], 1.0f);
+
+                    float firstButtonY = 45.0f;
+
+                    if (TABG == 1)
+                    {
+                        float lineX = outerChildPos.x - lineOffset - activeLineWidth;
+                        float lineY = outerChildPos.y + firstButtonY + (buttonHeight - activeLineHeight) / 2.0f - 20.0f;
+                        draw->AddRectFilled(
+                            ImVec2(lineX, lineY),
+                            ImVec2(lineX + activeLineWidth, lineY + activeLineHeight),
+                            activeLineColor,
+                            4.0f,
+                            ImDrawFlags_RoundCornersAll
+                        );
+                    }
+                    if (TABG == 2)
+                    {
+                        float lineX = outerChildPos.x - lineOffset - activeLineWidth;
+                        float lineY = outerChildPos.y + firstButtonY + buttonHeight + buttonSpacing + (buttonHeight - activeLineHeight) / 2.0f - 10.0f;
+                        draw->AddRectFilled(
+                            ImVec2(lineX, lineY),
+                            ImVec2(lineX + activeLineWidth, lineY + activeLineHeight),
+                            activeLineColor,
+                            4.0f,
+                            ImDrawFlags_RoundCornersAll
+                        );
+                    }
+                    if (TABG == 3)
+                    {
+                        float lineX = outerChildPos.x - lineOffset - activeLineWidth;
+                        float lineY = outerChildPos.y + firstButtonY + (buttonHeight + buttonSpacing) * 2 + (buttonHeight - activeLineHeight) / 2.0f - 10.0f;
+                        draw->AddRectFilled(
+                            ImVec2(lineX, lineY),
+                            ImVec2(lineX + activeLineWidth, lineY + activeLineHeight),
+                            activeLineColor,
+                            4.0f,
+                            ImDrawFlags_RoundCornersAll
+                        );
+                    }
+                    if (TABG == 4)
+                    {
+                        float lineX = outerChildPos.x - lineOffset - activeLineWidth;
+                        float lineY = outerChildPos.y + firstButtonY + (buttonHeight + buttonSpacing) * 3 + (buttonHeight - activeLineHeight) / 2.0f - 10.0f;
+                        draw->AddRectFilled(
+                            ImVec2(lineX, lineY),
+                            ImVec2(lineX + activeLineWidth, lineY + activeLineHeight),
+                            activeLineColor,
+                            4.0f,
+                            ImDrawFlags_RoundCornersAll
+                        );
+                    }
+                    if (TABG == 5)
+                    {
+                        float lineX = outerChildPos.x - lineOffset - activeLineWidth;
+                        float lineY = outerChildPos.y + firstButtonY + (buttonHeight + buttonSpacing) * 4 + (buttonHeight - activeLineHeight) / 2.0f - 10.0f;
+                        draw->AddRectFilled(
+                            ImVec2(lineX, lineY),
+                            ImVec2(lineX + activeLineWidth, lineY + activeLineHeight),
+                            activeLineColor,
+                            4.0f,
+                            ImDrawFlags_RoundCornersAll
+                        );
+                    }
+
+                    float innerPadding = 15.0f;
+                    ImGui::SetCursorPos(ImVec2(innerPadding, innerPadding));
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImColor(12, 12, 12, 200).Value);
+                    ImGui::BeginChild("InnerSidebar", ImVec2(sidebarWidth - (innerPadding * 2), sidebarHeight - (innerPadding * 2)), true, ImGuiWindowFlags_NoScrollbar);
+                    {
+                        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 25));
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0, 0, 0, 0));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+
+                        ImGui::SetCursorPos(ImVec2(0, 30));
+
+                        if (ImGui::ButtonTabEx(" ", " Visual", ImVec2(sidebarWidth - (innerPadding * 2), buttonHeight)) && TABG != 1)
+                        {
+                            TABG = 1;
+                            active = true;
+                        }
+
+                        if (ImGui::ButtonTabEx(" ", " Combat", ImVec2(sidebarWidth - (innerPadding * 2), buttonHeight)) && TABG != 2)
+                        {
+                            TABG = 2;
+                            active = true;
+                        }
+
+                        if (ImGui::ButtonTabEx(" ", " Memory", ImVec2(sidebarWidth - (innerPadding * 2), buttonHeight)) && TABG != 3)
+                        {
+                            TABG = 3;
+                            active = true;
+                        }
+
+                        if (ImGui::ButtonTabEx(" ", " Skins", ImVec2(sidebarWidth - (innerPadding * 2), buttonHeight)) && TABG != 4)
+                        {
+                            TABG = 4;
+                            active = true;
+                        }
+
+                        if (ImGui::ButtonTabEx(" ", " Settings", ImVec2(sidebarWidth - (innerPadding * 2), buttonHeight)) && TABG != 5)
+                        {
+                            TABG = 5;
+                            active = true;
+                        }
+
+                        ImGui::PopStyleColor(3);
+                        ImGui::PopStyleVar();
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleColor();
+                }
+                ImGui::EndChild();
+                ImGui::PopStyleColor();
+
+                float contentFrameX = pos.x + 165;
+                float contentFrameY = pos.y + 110;
+                float contentFrameWidth = 640;
+                float contentFrameHeight = 480;
+
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(7, 3.8125));
+
+                if (TABG == 1)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImColor(12, 12, 12, 150).Value);
+
+                    ImGui::SetCursorPos(ImVec2(165, 105));
+                    ImGui::BeginChild("A", ImVec2(328, 485));
+                    {
+                        NotifyCheckbox("Show Line", &Config.ESPMenu.isPlayerLine);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Box", &Config.ESPMenu.Box);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Count", &Config.ESPMenu.Count);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Health", &Config.ESPMenu.Health);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Name", &Config.ESPMenu.Name);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Distance", &Config.ESPMenu.Distance);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Alert", &Config.ESPMenu.Alert);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Skeleton", &Config.ESPMenu.Skeleton);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Show Aim Line", &Config.ESPMenu.Aimline);
+                        
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::SetCursorPos(ImVec2(512, 105));
+                    ImGui::BeginChild("B", ImVec2(328, 200));
+                    {
+                        ImGui::ColorEdit3("Bot Line Color", Config.sColorsESPBOT.LineBOT, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoInputs);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        ImGui::ColorEdit3("Bot Box Color", Config.sColorsESPBOT.BoxBOT, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoInputs);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        ImGui::ColorEdit3("Player Line Color", Config.sColorsESPPLAYER.LinePLAYER, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoInputs);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        ImGui::ColorEdit3("Player Box Color", Config.sColorsESPPLAYER.BoxPLAYER, ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoInputs);
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::SetCursorPos(ImVec2(512, 320));
+                    ImGui::BeginChild("C", ImVec2(328, 270));
+                    {
+                        static float min_val = 0.5f;
+                        static float max_val = 5.0f;
+
+                        ImGui::SliderVrtcl("Bot Line", ImGuiDataType_Float, &Config.Bline, &min_val, &max_val, "%.0f%%");
+
+                        ImGui::SameLine();
+
+                        ImGui::SliderVrtcl("Bot Box", ImGuiDataType_Float, &Config.Bbox, &min_val, &max_val, "%.0f%%");
+
+                        ImGui::SameLine();
+
+                        ImGui::SliderVrtcl("Player Line", ImGuiDataType_Float, &Config.Pline, &min_val, &max_val, "%.0f%%");
+
+                        ImGui::SameLine();
+
+                        ImGui::SliderVrtcl("Player Box", ImGuiDataType_Float, &Config.Pbox, &min_val, &max_val, "%.0f%%");
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::PopStyleColor();
+                }
+
+                if (TABG == 2)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImColor(12, 12, 12, 150).Value);
+
+                    ImGui::SetCursorPos(ImVec2(165, 105));
+                    ImGui::BeginChild("A", ImVec2(328, 485));
+                    {
+                        // ===== AIM CORE =====
+NotifyCheckbox("Aimbot 360", &Config.Aim.Aimbot360);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+NotifyCheckbox("Bullet Track", &Config.Aim.AimSilent);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+// ===== AIMLOCK =====
+if (NotifyCheckbox("Aimlock", &Config.Aim.AimAssist))
+{
+    Config.Aim.showAimAssistSlider = Config.Aim.AimAssist;
+}
+
+if (Config.Aim.showAimAssistSlider)
+{
+    ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+    ImGui::SliderFloat("Locking", &Config.Aim.AimAssistSize, 0.0f, 100.0f, "%.0f");
+}
+
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+// ===== EXTRA FEATURES =====
+NotifyCheckbox("Pump Boost", &Config.ExtraMenu.JetJ);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+NotifyCheckbox("Walk UnderWater", &Config.ExtraMenu.WalkUnderWater);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+NotifyCheckbox("Wallhack Yellow", &Config.ExtraMenu.WallHack);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+NotifyCheckbox("Wallhack Red", &Config.ExtraMenu.RedWallhack);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+NotifyCheckbox("Auto Speed", &Config.ExtraMenu.Speedhack);
+ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::SetCursorPos(ImVec2(512, 105));
+                    ImGui::BeginChild("B", ImVec2(328, 200));
+                    {
+                       // ===== TARGET LOCATION =====
+static const char *targets[] = {"Head", "Chest", "Body"};
+                        ImGui::Combo("Location", (int *)&Config.Aim.Target, targets, 3, -1);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+                        static const char *triggers[] = {"None", "Shooting", "Scoping"};
+                        ImGui::Combo("Trigger", (int *)&Config.Aim.Trigger, triggers, 3, -1);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+                        static const char *tarets[] = {"Distance", "FOV"};
+                        ImGui::Combo("Target By", (int *)&Config.Aim.By, tarets, 2, -1);
+
+
+
+                    }
+                    ImGui::EndChild();
+
+                  
+                        ImGui::SetCursorPos(ImVec2(512, 320));
+                        ImGui::BeginChild("C", ImVec2(328, 270));
+                        {
+                            // --- 3 vertical sliders filling the whole child ---
+                            float child_width = ImGui::GetContentRegionAvail().x;
+                            int slider_count = 4;
+                            float spacing = ImGui::GetStyle().ItemSpacing.x;
+                            float slider_width = (child_width - spacing * (slider_count - 1)) / slider_count;
+
+                            // Inside SliderVrtcl, width is dynamic
+                            // Example: SliderVrtcl internally uses width = slider_width
+
+                            static float min_view = 0.0f;
+                            static float max_view = 120.0f;
+                            ImGui::SliderVrtcl("IpadView", ImGuiDataType_Float, &WideVsize, &min_view, &max_view, "%.1f");
+
+                            ImGui::SameLine();
+
+                            static float min_vehicle = 0.0f;
+                            static float max_vehicle = 150.0f;
+                            ImGui::SliderVrtcl("Vehicle", ImGuiDataType_Float, &VehicleS, &min_vehicle, &max_vehicle, "%.1f");
+
+                            ImGui::SameLine();
+
+                            static float min_snowboard = 0.0f;
+                            static float max_snowboard = 100.0f;
+                            ImGui::SliderVrtcl("Snowboard", ImGuiDataType_Float, &SnowBsize, &min_snowboard, &max_snowboard, "%.1f");
+                            ImGui::SameLine();
+
+                            static float speed_min = 0.5f;
+                            static float speed_max = 3.0f;
+                            ImGui::SliderVrtcl("Auto speed", ImGuiDataType_Float, &Config.ExtraMenu.SpeedhackValue, &speed_min, &speed_max, "%.1f");
+    
+
+                        }
+                        ImGui::EndChild();
+
+
+
+                    ImGui::PopStyleColor();
+                }
+
+                if (TABG == 3)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImColor(12, 12, 12, 150).Value);
+
+                    ImGui::SetCursorPos(ImVec2(165, 105));
+                    ImGui::BeginChild("A", ImVec2(328, 485));
+                    {
+                        NotifyCheckbox("Hitbox", &Config.ExtraMenu.Hit);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("No Recoil", &Config.ExtraMenu.Recoil);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("No Spread", &Config.ExtraMenu.Spread);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("No Shake", &Config.ExtraMenu.Shake);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("No Overheat", &Config.ExtraMenu.Rpd);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("No Parachute", &Config.ExtraMenu.Parachute);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Firerate", &Config.ExtraMenu.Fire);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Fast Reload", &Config.ExtraMenu.Reload);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Fast Scope", &Config.ExtraMenu.Scope);
+                        ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                        NotifyCheckbox("Fast Switch", &Config.ExtraMenu.Switch);
+                    }
+                    ImGui::EndChild();
+
+                    
+                        ImGui::SetCursorPos(ImVec2(512, 105));
+                        ImGui::BeginChild("B", ImVec2(328, 485));
+                        {
+                            // --- Checkboxes ---
+                            NotifyCheckbox("Anti Flashbang", &Config.ExtraMenu.Flash);
+                            ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                            NotifyCheckbox("Weapon Kinetic", &Config.ExtraMenu.Kinetic);
+                            ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                            NotifyCheckbox("Fast Dive", &Config.ExtraMenu.Diving);
+                            ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+                            NotifyCheckbox("Advance UAV", &Config.ExtraMenu.Radar1);
+                            ImGui::SeparatorEx(ImGuiSeparatorFlags_Horizontal, 2.0f);
+
+                            // --- 3 vertical sliders filling the whole child ---
+                            float child_width = ImGui::GetContentRegionAvail().x;
+                            int slider_count = 3;
+                            float spacing = ImGui::GetStyle().ItemSpacing.x;
+                            float slider_width = (child_width - spacing * (slider_count - 1)) / slider_count;
+
+                            // SliderVrtcl internally should use `slider_width` for width
+                            static float min_slide = 0.0f;
+                            static float max_slide = 19.0f;
+                            ImGui::SliderVrtcl("Slide", ImGuiDataType_Float, &SlideRange, &min_slide, &max_slide, "%.1f");
+                                                
+                            ImGui::SameLine();
+
+                            static float min_speed = 0.5f;
+                            static float max_speed = 2.5f;
+                            ImGui::SliderVrtcl("Speed", ImGuiDataType_Float, &speedHackMultiplier, &min_speed, &max_speed, "%.1fx");
+
+                            ImGui::SameLine();
+
+                            static float min_jump = 0.5f;
+                            static float max_jump = 5.0f;
+                            ImGui::SliderVrtcl("Jump", ImGuiDataType_Float, &jumpHeightMultiplier, &min_jump, &max_jump, "%.2fx");
+                            
+
+                        }
+                        ImGui::EndChild();
+
+                    ImGui::PopStyleColor();
+                }
+
+if (TABG == 4)
+                {
+    // ============================================================
+    //  SKINS TAB  — exact layout match of reference screenshot
+    //  Strict-fit: every widget sized to ImGui::GetContentRegionAvail()
+    //  so nothing overflows the parent menu, on any screen width.
+    //  FIX: wrap content in a BeginChild positioned at (165,105) — same
+    //  content-frame origin used by every other tab — so the tab strip
+    //  (Character / Watch / Deadbox / Plane / Weapon) no longer overlaps
+    //  the left sidebar and everything fits inside the menu.
+    // ============================================================
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImColor(12, 12, 12, 150).Value);
+    // Responsive content-frame: auto-scale to whatever size the main menu is.
+    // Anchored at (165, 105) like every other tab, and fills the rest of the
+    // menu minus a small right/bottom margin — so it works on any resolution.
+    const float kSkinOriginX     = 165.0f;
+    const float kSkinOriginY     = 105.0f;
+    const float kSkinMarginR     = 10.0f;
+    const float kSkinMarginB     = 10.0f;
+    ImVec2      kSkinWinSize     = ImGui::GetWindowSize();
+    float       kSkinChildW      = kSkinWinSize.x - kSkinOriginX - kSkinMarginR;
+    float       kSkinChildH      = kSkinWinSize.y - kSkinOriginY - kSkinMarginB;
+    if (kSkinChildW < 320.0f) kSkinChildW = 320.0f;   // sane floor on tiny screens
+    if (kSkinChildH < 240.0f) kSkinChildH = 240.0f;
+    // Fallback to the classic 675x485 layout used by other tabs if the window
+    // hasn't laid out yet (size == 0 on the first frame).
+    if (kSkinWinSize.x < 10.0f) { kSkinChildW = 675.0f; kSkinChildH = 485.0f; }
+
+    ImGui::SetCursorPos(ImVec2(kSkinOriginX, kSkinOriginY));
+    ImGui::BeginChild("SkinsTabContent", ImVec2(kSkinChildW, kSkinChildH), false,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    // ---------- Theme ----------
+    const ImVec4 COL_PURPLE        = ImVec4(0.62f, 0.20f, 0.85f, 1.00f);
+    const ImVec4 COL_PURPLE_DIM    = ImVec4(0.50f, 0.15f, 0.75f, 0.85f);
+    const ImVec4 COL_PURPLE_TEXT   = ImVec4(0.80f, 0.45f, 1.00f, 1.00f);
+    const ImVec4 COL_INPUT_BG      = ImVec4(0.06f, 0.04f, 0.10f, 0.55f);
+    const ImVec4 COL_TAB_ACTIVE    = ImVec4(0.45f, 0.10f, 0.65f, 0.85f);
+    const ImVec4 COL_TAB_IDLE      = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    const ImVec4 COL_TAB_HOVER     = ImVec4(0.45f, 0.20f, 0.70f, 0.45f);
+    const ImVec4 COL_TEXT_ON_DARK  = ImVec4(0.92f, 0.92f, 0.95f, 1.00f);
+    const ImVec4 COL_TEXT_DIM      = ImVec4(0.78f, 0.78f, 0.85f, 0.95f);
+
+    // Global style for this tab
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding,   8.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding,  10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,    ImVec2(8, 8));
+    ImGui::PushStyleColor(ImGuiCol_Border,         COL_PURPLE);
+    ImGui::PushStyleColor(ImGuiCol_FrameBg,        COL_INPUT_BG);
+    ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.62f,0.20f,0.85f,0.30f));
+    ImGui::PushStyleColor(ImGuiCol_FrameBgActive,  ImVec4(0.62f,0.20f,0.85f,0.40f));
+    ImGui::PushStyleColor(ImGuiCol_CheckMark,      COL_PURPLE_TEXT);
+    ImGui::PushStyleColor(ImGuiCol_Text,           COL_TEXT_ON_DARK);
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled,   COL_PURPLE_TEXT);
+
+    // ============================================================
+    //  PERSISTENT FAVORITES + RARITY / SEARCH STATE (file-backed)
+    //  Previously stored ONLY at /sdcard/Android/data/cod_skin_favorites.cfg
+    //  which on modern Android is NOT writable due to scoped-storage,
+    //  so the file was silently failing to save and favorites vanished
+    //  on next login. We now try a prioritized list of known-writable
+    //  paths, create the parent directory if missing, and verify by
+    //  reading back. First successful path becomes the active path
+    //  (cached across calls) so load-on-next-launch finds the file.
+    // ============================================================
+    static std::unordered_map<std::string, bool> g_FavSkins;
+    static bool g_FavLoaded      = false;
+    static bool g_FavOnly        = false;     // "Show favorites only" toggle
+    static int  g_RarityFilter   = -1;        // -1=All, 0=MYTHIC, 1=LEGENDARY, 2=EPIC, 3=COMMON
+    static std::string g_FavActivePath;       // resolved writable path (cached)
+
+    // Candidate save locations, in order of preference.
+    static const char* kFavPathCandidates[] = {
+        "/sdcard/Android/media/astral_skin_favorites.cfg",
+        "/storage/emulated/0/Android/media/astral_skin_favorites.cfg",
+        "/sdcard/astral_skin_favorites.cfg",
+        "/storage/emulated/0/astral_skin_favorites.cfg",
+        "/sdcard/Android/data/astral_skin_favorites.cfg",
+        "/data/local/tmp/astral_skin_favorites.cfg"
+    };
+
+    auto EnsureParentDir = [](const std::string& path) {
+        size_t slash = path.find_last_of('/');
+        if (slash == std::string::npos || slash == 0) return;
+        std::string dir = path.substr(0, slash);
+        // mkdir -p (walk each segment)
+        for (size_t i = 1; i <= dir.size(); ++i) {
+            if (i == dir.size() || dir[i] == '/') {
+                std::string sub = dir.substr(0, i);
+                if (!sub.empty()) mkdir(sub.c_str(), 0775);
+            }
+        }
+    };
+
+    auto FavSave = [&]() {
+        auto tryWrite = [&](const std::string& p) -> bool {
+            EnsureParentDir(p);
+            std::ofstream f(p, std::ios::trunc);
+            if (!f.is_open()) return false;
+            for (auto& kv : g_FavSkins) if (kv.second) f << kv.first << "\n";
+            f.flush();
+            f.close();
+            // verify
+            std::ifstream v(p);
+            bool ok = v.is_open();
+            v.close();
+            return ok;
+        };
+        // If we already have an active path, keep using it.
+        if (!g_FavActivePath.empty() && tryWrite(g_FavActivePath)) return;
+        for (const char* cand : kFavPathCandidates) {
+            if (tryWrite(cand)) { g_FavActivePath = cand; return; }
+        }
+    };
+
+    auto FavLoad = [&]() {
+        g_FavSkins.clear();
+        auto tryRead = [&](const std::string& p) -> bool {
+            std::ifstream f(p);
+            if (!f.is_open()) return false;
+            std::string line;
+            bool any = false;
+            while (std::getline(f, line)) {
+                if (!line.empty()) { g_FavSkins[line] = true; any = true; }
+            }
+            (void)any;
+            return true;
+        };
+        // Read from the FIRST candidate that exists; remember it as active.
+        for (const char* cand : kFavPathCandidates) {
+            if (tryRead(cand)) { g_FavActivePath = cand; return; }
+        }
+    };
+    if (!g_FavLoaded) { FavLoad(); g_FavLoaded = true; }
+
+    // Rarity helpers — strip the "[MYTHIC] " / "[LEGENDARY] " / etc. prefix
+    // for CLEAN display, while keeping the original string as the stable
+    // internal ID so toggles / favorites / apply logic still work.
+    auto GetRarity = [](const std::string& s) -> int {
+        if (s.find("[MYTHIC]")    != std::string::npos) return 0;
+        if (s.find("[LEGENDARY]") != std::string::npos) return 1;
+        if (s.find("[EPIC]")      != std::string::npos) return 2;
+        if (s.find("[COMMON]")    != std::string::npos) return 3;
+        return -1;
+    };
+    auto StripRarity = [](const std::string& s) -> std::string {
+        size_t p = s.find(']');
+        if (s.size() > 0 && s[0] == '[' && p != std::string::npos)
+            return (p + 2 < s.size()) ? s.substr(p + 2) : s.substr(p + 1);
+        return s;
+    };
+    // customCharSearch is declared below in the search row, forward-declared here
+    // so PassesFilters can reference it. (Static storage => address stable.)
+    static char customCharSearch[128];
+    auto PassesFilters = [&](const std::string& name, bool applyCustomCharSearch = false) -> bool {
+        if (!g_SkinSearch.MatchesSearch(name)) return false;
+        if (g_FavOnly && !g_FavSkins[name])    return false;
+        if (g_RarityFilter >= 0 && GetRarity(name) != g_RarityFilter) return false;
+        // Extra filter ONLY for the Character tab: "Search Custom Char" narrows
+        // the character list by name as well. Other tabs ignore this field.
+        if (applyCustomCharSearch && customCharSearch[0] != '\0') {
+            std::string q = ToLower(customCharSearch);
+            if (ToLower(name).find(q) == std::string::npos) return false;
+        }
+        return true;
+    };
+
+    // ============================================================
+    //  INLINE SKIN ROW RENDERER
+    //  [★] Clean Name ............................ [ ON / OFF ]
+    //  - Guarantees clean display (no "##id" leakage)
+    //  - Compact, consistent row height
+    //  - ON/OFF button right-anchored, name left-aligned
+    //  - Favorite star persists to disk
+    // ============================================================
+    auto SkinRowInline = [&](const std::string& fullName,
+                             bool* enabled,
+                             const std::function<void()>& onToggle)
+    {
+        const float rowH    = 30.0f;
+        const float starW   = 28.0f;
+        const float toggleW = 62.0f;
+        const float gap     = 6.0f;
+        float rowW          = ImGui::GetContentRegionAvail().x;
+        if (rowW < 160.0f) rowW = 160.0f;
+
+        ImGui::PushID(fullName.c_str());          // stable unique scope
+        ImVec2 rowStart = ImGui::GetCursorPos();
+
+        // ----- Favorite star (left) -----
+        bool fav = g_FavSkins[fullName];
+        ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0,0,0,0));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f,0.80f,0.20f,0.25f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(1.0f,0.80f,0.20f,0.45f));
+        ImGui::PushStyleColor(ImGuiCol_Text, fav ? ImVec4(1.0f,0.82f,0.22f,1.0f)
+                                                 : ImVec4(0.55f,0.55f,0.60f,1.0f));
+        if (ImGui::Button(fav ? "*" : "o", ImVec2(starW, rowH))) {
+            g_FavSkins[fullName] = !fav;
+            FavSave();
+        }
+        ImGui::PopStyleColor(4);
+
+        // ----- Clean name (middle) -----
+        ImGui::SameLine(0.0f, gap);
+        float nameW = rowW - starW - toggleW - gap * 2.0f;
+        if (nameW < 40.0f) nameW = 40.0f;
+
+        std::string clean = StripRarity(fullName);
+        int r             = GetRarity(fullName);
+        ImVec4 rarityCol  = COL_TEXT_ON_DARK;
+        if      (r == 0) rarityCol = ImVec4(1.00f, 0.35f, 0.35f, 1.0f); // MYTHIC red
+        else if (r == 1) rarityCol = ImVec4(0.45f, 0.95f, 0.45f, 1.0f); // LEGENDARY green
+        else if (r == 2) rarityCol = ImVec4(0.45f, 0.70f, 1.00f, 1.0f); // EPIC blue
+        else if (r == 3) rarityCol = ImVec4(0.95f, 0.90f, 0.35f, 1.0f); // COMMON yellow
+
+        ImVec2 textStart = ImGui::GetCursorPos();
+        ImGui::BeginChild("##name", ImVec2(nameW, rowH), false,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::SetCursorPosY((rowH - ImGui::GetTextLineHeight()) * 0.5f);
+        if (r >= 0) {
+            const char* tag = (r==0?"[MYTHIC] ":r==1?"[LEGEND] ":r==2?"[EPIC] ":"[COMMON] ");
+            ImGui::TextColored(rarityCol, "%s", tag);
+            ImGui::SameLine(0.0f, 2.0f);
+        }
+        ImGui::TextColored(COL_TEXT_ON_DARK, "%s", clean.c_str());
+        ImGui::EndChild();
+
+        // ----- Checkbox-style ON/OFF toggle (right) -----
+        ImGui::SameLine(0.0f, gap);
+        // A pill-track with a sliding knob. Acts as both a checkbox and a
+        // visual ON/OFF indicator. Much cleaner than the old ON/OFF button.
+        const float trackW = toggleW;
+        const float trackH = 22.0f;
+        ImVec2 cursorScreen = ImGui::GetCursorScreenPos();
+        // Center vertically within rowH
+        float yOff = (rowH - trackH) * 0.5f;
+        ImVec2 tMin(cursorScreen.x, cursorScreen.y + yOff);
+        ImVec2 tMax(tMin.x + trackW, tMin.y + trackH);
+
+        ImGui::InvisibleButton("##toggle", ImVec2(trackW, rowH));
+        bool hoveredTgl = ImGui::IsItemHovered();
+        bool clickedTgl = ImGui::IsItemClicked(0);
+        if (clickedTgl) {
+            *enabled = !*enabled;
+            onToggle();
+            PushMenuNotification(fullName.c_str(), *enabled);
+        }
+
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        ImU32 trackCol = *enabled
+            ? ImColor(36, 180, 72, 220)           // green track (enabled)
+            : ImColor(70, 18, 22, 210);           // deep red track (disabled)
+        ImU32 trackBorder = *enabled
+            ? ImColor(70, 220, 110, hoveredTgl ? 255 : 200)
+            : ImColor(210, 70, 70,  hoveredTgl ? 255 : 170);
+
+        dl->AddRectFilled(tMin, tMax, trackCol, trackH * 0.5f);
+        dl->AddRect(tMin, tMax, trackBorder, trackH * 0.5f, 0, 1.4f);
+
+        // Sliding knob
+        float knobR = (trackH * 0.5f) - 3.0f;
+        float knobX = *enabled ? (tMax.x - knobR - 3.0f) : (tMin.x + knobR + 3.0f);
+        float knobY = (tMin.y + tMax.y) * 0.5f;
+        dl->AddCircleFilled(ImVec2(knobX, knobY), knobR, ImColor(245, 245, 250, 255), 18);
+
+        // Label text (ON / OFF) centered in the free half of the track
+        const char* lbl = *enabled ? "ON" : "OFF";
+        ImVec2 ts = ImGui::CalcTextSize(lbl);
+        float lblX = *enabled ? (tMin.x + 8.0f) : (tMax.x - ts.x - 8.0f);
+        float lblY = (tMin.y + tMax.y) * 0.5f - ts.y * 0.5f;
+        dl->AddText(ImVec2(lblX, lblY), ImColor(255,255,255,235), lbl);
+
+        ImGui::PopID();
+        // thin separator for visual clarity between rows
+        ImGui::Spacing();
+    };
+
+    // Strict available width (never exceeded by any child widget)
+    float availW = ImGui::GetContentRegionAvail().x;
+    if (availW < 60.0f) availW = 60.0f;
+
+    ImGui::Spacing();
+
+    // ===================================================
+    //  TAB STRIP — Character | Watch | Deadbox | Plane | Weapon
+    //  Single row, equal width, only active tab is filled
+    // ===================================================
+    static int  skin_tab            = 0;
+    static int  prev_skin_tab       = -1;  // -1 so the very first Character-tab entry also triggers the prompt
+    // Characters-tab "custom character?" gate:
+    //   kCharFlowIdle  = no popup showing, no override
+    //   kCharFlowAsk   = popup visible, waiting YES / NO
+    //   kCharFlowTyping= user said YES, keyboard open + they pick a skin
+    //   kCharFlowSkip  = user said NO, show default character list
+    enum CharFlow { kCharFlowIdle = 0, kCharFlowAsk, kCharFlowTyping, kCharFlowSkip };
+    static int  char_flow           = kCharFlowIdle;
+    const char* tab_names[] = { "Character", "Watch", "Deadbox", "Plane", "Weapon" };
+    const int   tab_count   = 5;
+
+    float spX  = ImGui::GetStyle().ItemSpacing.x;
+    float btnW = (availW - spX * (tab_count - 1)) / (float)tab_count;
+    if (btnW < 40.0f) btnW = 40.0f;
+    float tabH = 36.0f;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f); // no borders on idle tabs
+    for (int i = 0; i < tab_count; i++)
+    {
+        if (i > 0) ImGui::SameLine(0.0f, spX);
+        bool selected = (skin_tab == i);
+
+        ImGui::PushStyleColor(ImGuiCol_Button,        selected ? COL_TAB_ACTIVE : COL_TAB_IDLE);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, selected ? COL_TAB_ACTIVE : COL_TAB_HOVER);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  COL_TAB_ACTIVE);
+        ImGui::PushStyleColor(ImGuiCol_Text,          selected ? ImVec4(1,1,1,1) : COL_TEXT_DIM);
+
+        if (ImGui::Button(tab_names[i], ImVec2(btnW, tabH))) {
+            // Re-trigger the Character prompt every time the Character tab is TAPPED
+            // (even if it was already active), per user request.
+            if (i == 0) char_flow = kCharFlowAsk;
+            skin_tab = i;
+        }
+
+        ImGui::PopStyleColor(4);
+    }
+    ImGui::PopStyleVar(2);
+
+    // Detect switching AWAY from the Character tab → close any pending flow.
+    // (The prompt itself is triggered directly by the tab button click above.)
+    if (skin_tab != prev_skin_tab)
+    {
+        if (skin_tab != 0) char_flow = kCharFlowIdle;
+        prev_skin_tab = skin_tab;
+    }
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    // ===================================================
+    //  SEARCH ROW — "Search Skin:"  +  "Search Custom Char:"
+    //  Side-by-side on wide menus, stacks on narrow.
+    //  NOTE: customCharSearch is declared above (static) so PassesFilters
+    //  can read it. We only initialize-on-first-frame here.
+    // ===================================================
+    static bool  s_customCharSearchInit = false;
+    if (!s_customCharSearchInit) { customCharSearch[0] = '\0'; s_customCharSearchInit = true; }
+    bool  stackSearch = (availW < 480.0f);
+    float searchW     = stackSearch ? availW : (availW - spX) * 0.5f;
+
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 9));
+
+    // -- Left: Search Skin --
+    ImGui::BeginGroup();
+    ImGui::TextColored(COL_TEXT_DIM, "Search Skin:");
+    ImGui::SetNextItemWidth(searchW);
+    g_SkinSearch.RenderSearchBar();
+    ImGui::EndGroup();
+
+    if (!stackSearch) ImGui::SameLine(0.0f, spX);
+
+    // -- Right: Search Custom Char --
+    ImGui::BeginGroup();
+    ImGui::TextColored(COL_TEXT_DIM, "Search Custom Char:");
+    ImGui::SetNextItemWidth(searchW);
+    ImGui::InputTextWithHint("##CustomCharSearch", "Type here...", customCharSearch, sizeof(customCharSearch));
+    ImGui::EndGroup();
+
+    ImGui::PopStyleVar(); // FramePadding
+
+    ImGui::Spacing();
+
+    // ===================================================
+    //  ACTION ROW  — [ ★ Favorites ] ............ [ Keyboard ]
+    //  Favorites button on LEFT toggles "show favorites only".
+    //  Keyboard button on RIGHT opens the new sliding keyboard.
+    // ===================================================
+    static bool showKeyboardWindow = false;
+    {
+        const float favBtnW = 140.0f;
+        const float kbBtnW  = 140.0f;
+
+        // --- Favorites (LEFT) ---
+        ImVec4 favOn  = ImVec4(1.0f, 0.82f, 0.22f, 0.90f);   // gold
+        ImVec4 favOff = COL_INPUT_BG;
+        ImGui::PushStyleColor(ImGuiCol_Button,        g_FavOnly ? favOn : favOff);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, g_FavOnly ? ImVec4(1.0f,0.88f,0.30f,1.0f)
+                                                                : ImVec4(0.62f,0.20f,0.85f,0.35f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  g_FavOnly ? ImVec4(1.0f,0.75f,0.15f,1.0f)
+                                                                : COL_TAB_ACTIVE);
+        ImGui::PushStyleColor(ImGuiCol_Text,          g_FavOnly ? ImVec4(0.10f,0.06f,0.00f,1.0f)
+                                                                : COL_TEXT_ON_DARK);
+        if (ImGui::Button(g_FavOnly ? "* Favorites (on)" : "* Favorites",
+                          ImVec2(favBtnW, 26)))
+            g_FavOnly = !g_FavOnly;
+        ImGui::PopStyleColor(4);
+
+        // --- Keyboard (RIGHT, pushed to far right) ---
+        ImGui::SameLine(0.0f, 0.0f);
+        float pushX = availW - favBtnW - kbBtnW;
+        if (pushX < 6.0f) pushX = 6.0f;
+        ImGui::Dummy(ImVec2(pushX, 1));
+        ImGui::SameLine(0.0f, 0.0f);
+
+        ImGui::PushStyleColor(ImGuiCol_Button,        COL_INPUT_BG);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.62f,0.20f,0.85f,0.35f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive,  COL_TAB_ACTIVE);
+        if (ImGui::Button(showKeyboardWindow ? "Hide Keyboard" : "Show Keyboard",
+                          ImVec2(kbBtnW, 26)))
+            showKeyboardWindow = !showKeyboardWindow;
+        ImGui::PopStyleColor(3);
+    }
+
+    // New sliding virtual keyboard anchored at the bottom of the screen.
+    // Typing target depends on mode:
+    //   - While user is in "Custom Character TYPING" flow -> types into
+    //     customCharSearch (narrows the Character list by name).
+    //   - Otherwise -> types into the global Skin Search buffer.
+    {
+        char*  kbBuf  = (char*)g_SkinSearch.GetSearchQuery();
+        size_t kbSize = 256;
+        if (char_flow == kCharFlowTyping) {
+            kbBuf  = customCharSearch;
+            kbSize = sizeof(customCharSearch);
+        }
+        RenderVirtualKeyboard("##AstralVKB", kbBuf, kbSize, &showKeyboardWindow);
+        // If user closes the keyboard while in typing mode, exit it.
+        if (char_flow == kCharFlowTyping && !showKeyboardWindow)
+            char_flow = kCharFlowIdle;
+    }
+
+    // ===================================================
+    //  CHARACTER TAB — Custom-character YES/NO popup
+    //  Triggered every time the user switches INTO the Character tab.
+    //  YES -> opens the keyboard targeting "Search Custom Char" so the
+    //         user can type the character name, then pick a skin.
+    //  NO  -> falls through to the default character list.
+    // ===================================================
+    if (char_flow == kCharFlowAsk)
+    {
+        ImGui::OpenPopup("##CustomCharPrompt");
+        char_flow = kCharFlowIdle; // consume the trigger; popup now owns state
+    }
+
+    {
+        ImVec2 disp = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos(ImVec2(disp.x * 0.5f, disp.y * 0.5f),
+                                ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(460.0f, 200.0f), ImGuiCond_Always);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22, 20));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 14.0f);
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.07f, 0.04f, 0.12f, 0.97f));
+        ImGui::PushStyleColor(ImGuiCol_Border,  COL_PURPLE);
+
+        if (ImGui::BeginPopupModal("##CustomCharPrompt", nullptr,
+                                   ImGuiWindowFlags_NoResize |
+                                   ImGuiWindowFlags_NoMove   |
+                                   ImGuiWindowFlags_NoTitleBar))
+        {
+            ImGui::PushFont(bold);
+            ImGui::TextColored(COL_PURPLE_TEXT, "CUSTOM CHARACTER");
+            ImGui::PopFont();
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::TextWrapped("PLEASE TYPE THE CHARACTER THAT YOU WOULD LIKE TO CUSTOMIZE");
+            ImGui::Spacing();
+            ImGui::TextColored(COL_TEXT_DIM, "(The keyboard will open automatically on YES)");
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            float btnW2 = 180.0f;
+            float totalBtnW = btnW2 * 2 + 14.0f;
+            float offX = (ImGui::GetContentRegionAvail().x - totalBtnW) * 0.5f;
+            if (offX > 0) { ImGui::Dummy(ImVec2(offX, 1)); ImGui::SameLine(0,0); }
+
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.20f,0.75f,0.35f,0.90f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.28f,0.85f,0.45f,1.00f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.18f,0.65f,0.30f,1.00f));
+            if (ImGui::Button("YES", ImVec2(btnW2, 40)))
+            {
+                char_flow = kCharFlowTyping;
+                showKeyboardWindow = true;                     // open keyboard
+                customCharSearch[0] = '\0';                    // clear prev query
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(3);
+
+            ImGui::SameLine(0.0f, 14.0f);
+
+            ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.45f,0.10f,0.15f,0.90f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.60f,0.15f,0.20f,1.00f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.35f,0.08f,0.12f,1.00f));
+            if (ImGui::Button("NO", ImVec2(btnW2, 40)))
+            {
+                char_flow = kCharFlowSkip;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::PopStyleColor(3);
+
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(2);
+    }
+
+    ImGui::Spacing();
+
+    // ===================================================
+    //  CUSTOM CHARACTER — clean single-row dropdown
+    //  (shown only on the Character tab, matching the reference image)
+    // ===================================================
+    if (skin_tab == 0)
+    {
+        ImGui::TextColored(COL_PURPLE_TEXT, "Custom character:");
+        if (!g_targetCharacters.empty())
+        {
+            // Build filtered list from the "Search Custom Char" box only.
+            std::vector<int>         filteredIndices;
+            std::vector<const char*> filteredNames;
+            std::string customLower = ToLower(customCharSearch);
+            for (size_t i = 0; i < g_targetCharacters.size(); i++) {
+                const auto& t = g_targetCharacters[i];
+                bool match = customLower.empty() ||
+                             ToLower(t.name).find(customLower) != std::string::npos;
+                if (match) {
+                    filteredIndices.push_back((int)i);
+                    filteredNames.push_back(t.name.c_str());
+                }
+            }
+
+            if (!filteredNames.empty())
+            {
+                int currentInFiltered = -1;
+                for (size_t i = 0; i < filteredIndices.size(); i++)
+                    if (filteredIndices[i] == g_selectedTargetCharIndex) { currentInFiltered = (int)i; break; }
+                if (currentInFiltered == -1) currentInFiltered = 0;
+
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 10));
+                ImGui::SetNextItemWidth(availW);
+                if (ImGui::Combo("##TargetChar", &currentInFiltered,
+                                 filteredNames.data(), (int)filteredNames.size()))
+                    g_selectedTargetCharIndex = filteredIndices[currentInFiltered];
+                ImGui::PopStyleVar();
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4(1,0.5f,0.5f,1), "No matching characters");
+            }
+        }
+        else ImGui::TextColored(COL_PURPLE_TEXT, "Loading target characters...");
+
+        ImGui::Spacing();
+    }
+
+    // ===================================================
+    //  SCROLLABLE LIST  (strict-fit, never overflows)
+    // ===================================================
+    float listH = ImGui::GetContentRegionAvail().y - 6.0f;
+    if (listH < 80.0f) listH = 80.0f;
+
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.04f, 0.03f, 0.07f, 0.45f));
+    ImGui::BeginChild("##SkinList", ImVec2(availW, listH), true,
+                      ImGuiWindowFlags_AlwaysVerticalScrollbar);
+
+    switch (skin_tab)
+    {
+    // ---------------- CHARACTERS ----------------
+    case 0:
+        if (!charData.empty())
+        {
+            for (const auto& getchar : charData)
+            {
+                // On the Character tab, BOTH "Search Skin" and "Search Custom Char"
+                // narrow this list (AND logic). Each row toggles independently.
+                if (!PassesFilters(getchar.charName, /*applyCustomCharSearch=*/true)) continue;
+
+                SkinRowInline(getchar.charName, &sBool[getchar.charName],
+                [&]() {
+                    // Independent ON/OFF — no auto-disable of other character skins.
+                    if (CharacterModelConfigInstance.size() > 0 &&
+                        itemResourceConfigInstance.size() > 0 &&
+                        RoleConfConfigInstance.size() > 0 &&
+                        RolePackConfConfigInstance.size() > 0 &&
+                        BRDeadboxSkinConfigInstance.size() > 0)
+                    {
+                        int selectedTraitor1P = g_targetCharacters[g_selectedTargetCharIndex].traitor1p;
+                        if (g_targetCharacters[g_selectedTargetCharIndex].name == "Charly") selectedTraitor1P = 710001101;
+                        CharacterModelFields* targetCharacter1P = nullptr;
+                        for (auto charModel : CharacterModelConfigInstance) {
+                            if (!charModel) continue;
+                            CharacterModelFields* cf = (CharacterModelFields*)((uintptr_t)charModel + 0x10);
+                            if (cf->Traitor1P == selectedTraitor1P) { targetCharacter1P = cf; break; }
+                            if (cf->Traitor1P == 710001101) targetCharacter1P = cf;
+                        }
+                        if (targetCharacter1P) {
+                            targetCharacter1P->BRBagModel         = getchar.charModel[0];
+                            targetCharacter1P->BRHeadModel        = getchar.charModel[1];
+                            targetCharacter1P->BRLobby            = getchar.charModel[2];
+                            targetCharacter1P->BRModel            = getchar.charModel[3];
+                            targetCharacter1P->BindEffect1P       = getchar.charModel[4];
+                            targetCharacter1P->ChangeClipEffect1P = getchar.charModel[5];
+                            targetCharacter1P->DefaultModelID     = getchar.charModel[6];
+                            targetCharacter1P->Guarder1P          = getchar.charModel[7];
+                            targetCharacter1P->Guarder3P          = getchar.charModel[8];
+                            targetCharacter1P->GuarderBagModel    = getchar.charModel[9];
+                            targetCharacter1P->GuarderHeadModel   = getchar.charModel[10];
+                            targetCharacter1P->GuarderLobby       = getchar.charModel[11];
+                        }
+
+                        int selectedTraitor3P = g_targetCharacters[g_selectedTargetCharIndex].traitor3p;
+                        if (g_targetCharacters[g_selectedTargetCharIndex].name == "Charly") selectedTraitor3P = 710001102;
+                        CharacterModelFields* targetCharacter3P = nullptr;
+                        for (auto charModel : CharacterModelConfigInstance) {
+                            if (!charModel) continue;
+                            CharacterModelFields* cf = (CharacterModelFields*)((uintptr_t)charModel + 0x10);
+                            if (cf->Traitor3P == selectedTraitor3P) { targetCharacter3P = cf; break; }
+                            if (cf->Traitor1P == 710001102) targetCharacter3P = cf;
+                        }
+                        if (targetCharacter3P) {
+                            targetCharacter3P->BRBagModel         = getchar.charModel[0];
+                            targetCharacter3P->BRHeadModel        = getchar.charModel[1];
+                            targetCharacter3P->BRLobby            = getchar.charModel[2];
+                            targetCharacter3P->BRModel            = getchar.charModel[3];
+                            targetCharacter3P->BindEffect1P       = getchar.charModel[4];
+                            targetCharacter3P->ChangeClipEffect1P = getchar.charModel[5];
+                            targetCharacter3P->DefaultModelID     = getchar.charModel[6];
+                            targetCharacter3P->Guarder1P          = getchar.charModel[7];
+                            targetCharacter3P->Guarder3P          = getchar.charModel[8];
+                            targetCharacter3P->GuarderBagModel    = getchar.charModel[9];
+                            targetCharacter3P->GuarderHeadModel   = getchar.charModel[10];
+                            targetCharacter3P->GuarderLobby       = getchar.charModel[11];
+                        }
+
+                        int selectedItemFieldsID = g_targetCharacters[g_selectedTargetCharIndex].itemID;
+                        if (g_targetCharacters[g_selectedTargetCharIndex].name == "Charly") selectedItemFieldsID = 100301208;
+                        ItemResourceFields* targetItem = nullptr;
+                        for (auto itemRes : itemResourceConfigInstance) {
+                            if (!itemRes) continue;
+                            ItemResourceFields* itf = (ItemResourceFields*)((uintptr_t)itemRes + 0x10);
+                            if (itf->ID == selectedItemFieldsID) { targetItem = itf; break; }
+                            if (itf->ID == 100301208) targetItem = itf;
+                        }
+                        if (targetItem) {
+                            targetItem->FxAssetID         = getchar.charRes[0];
+                            targetItem->InventoryModelID  = getchar.charRes[1];
+                            targetItem->ModelAssetIDRaw   = getchar.charRes[2];
+                            targetItem->UISmallSpriteName = getchar.charRes2[0];
+                            targetItem->UIMiniSpriteName  = getchar.charRes2[1];
+                            targetItem->UISpriteName      = getchar.charRes2[2];
+                            targetItem->UISquareSpriteName= getchar.charRes2[3];
+                        }
+
+                        int selectedRoleFID = g_targetCharacters[g_selectedTargetCharIndex].roleID;
+                        if (g_targetCharacters[g_selectedTargetCharIndex].name == "Charly") selectedRoleFID = 100301208;
+                        RoleConfFields* targetRole = nullptr;
+                        for (auto roles : RoleConfConfigInstance) {
+                            if (!roles) continue;
+                            RoleConfFields* rf = (RoleConfFields*)((uintptr_t)roles + 0x10);
+                            if (rf->ID == selectedRoleFID) { targetRole = rf; break; }
+                            if (rf->ID == 100301208) targetRole = rf;
+                        }
+                        if (targetRole) {
+                            targetRole->roleLeftArmID       = getchar.charRole[0];
+                            targetRole->roleFinalSuitID     = getchar.charRole[1];
+                            targetRole->roleBasicHologramID = getchar.charRole[2];
+                            targetRole->ColorID             = getchar.charRole[3];
+                            targetRole->ColorSubID          = getchar.charRole[4];
+                            targetRole->ShowRare            = getchar.charRole[5];
+                            targetRole->RoleLvGroupID       = getchar.charRole[6];
+                            targetRole->RolePackID          = getchar.charRole[7];
+                            targetRole->LOCID_Name          = getchar.charRole2[0];
+                        }
+
+                        int selectedRolePackID = g_targetCharacters[g_selectedTargetCharIndex].rolepackID;
+                        for (auto pack : RolePackConfConfigInstance) {
+                            if (!pack) continue;
+                            packfields = (RolePackFields*)((uintptr_t)pack + 0x10);
+                            if (packfields->RolePackID == selectedRolePackID) {
+                                packfields->EntryAnimID      = getchar.charPack[1];
+                                packfields->GestureId        = getchar.charPack[2];
+                                packfields->HandEffectUI     = getchar.charPack[3];
+                                packfields->LoadingFrame     = getchar.charPack[4];
+                                packfields->KillStreakSkinID = getchar.charPack[5];
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        else ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "No character skins loaded");
+        break;
+
+    // ---------------- WATCHES ----------------
+    case 1:
+        if (watch.size() > 0)
+        {
+            for (const auto& forwatch : watch)
+            {
+                if (!PassesFilters(forwatch.watchname)) continue;
+                if (forwatch.watchname.find("Watch") == std::string::npos ||
+                    forwatch.watchname.find("Face")  != std::string::npos) continue;
+
+                SkinRowInline(forwatch.watchname, &sBool[forwatch.watchname],
+                [&]() {
+                    if (sBool[forwatch.watchname])
+                        for (const auto& other : watch)
+                            if (other.watchname != forwatch.watchname)
+                                sBool[other.watchname] = false;
+
+                    int selectedTraitor1P = g_targetCharacters[g_selectedTargetCharIndex].traitor1p;
+                    if (g_targetCharacters[g_selectedTargetCharIndex].name == "Charly") selectedTraitor1P = 710001101;
+                    if (CharacterModelConfigInstance.size() > 0)
+                        for (auto charModel : CharacterModelConfigInstance) {
+                            if (!charModel) continue;
+                            characterfields = (CharacterModelFields*)((uintptr_t)charModel + 0x10);
+                            if (characterfields->Traitor1P == selectedTraitor1P)
+                                characterfields->BindEffect1P = forwatch.watchvalue;
+                        }
+                });
+            }
+        }
+        else ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "No watch skins loaded");
+        break;
+
+    // ---------------- DEADBOXES ----------------
+    case 2:
+        if (deadboxF.size() > 0)
+        {
+            for (const auto& deadx : deadboxF)
+            {
+                if (!PassesFilters(deadx.deadname)) continue;
+                SkinRowInline(deadx.deadname, &sBool[deadx.deadname],
+                [&]() {
+                    if (sBool[deadx.deadname])
+                        for (const auto& other : deadboxF)
+                            if (other.deadname != deadx.deadname)
+                                sBool[other.deadname] = false;
+                    if (CharacterModelConfigInstance.size() > 0)
+                        for (auto deadID : BRDeadboxSkinConfigInstance) {
+                            if (!deadID) continue;
+                            deadboxFields = (BRDeadboxSkinFields*)((uintptr_t)deadID + 0x10);
+                            if (deadboxFields->ID == 180300004) {
+                                deadboxFields->ColorID            = deadx.dead[0];
+                                deadboxFields->DeadBoxEffectAsset = deadx.dead[1];
+                                deadboxFields->Flag               = deadx.dead[2];
+                                deadboxFields->FlagAsset          = deadx.dead[3];
+                                deadboxFields->ModelAsset3P       = deadx.dead[4];
+                                deadboxFields->ModelAssetUI       = deadx.dead[5];
+                            }
+                        }
+                });
+            }
+        }
+        else ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "No deadbox skins loaded");
+        break;
+
+    // ---------------- PLANES ----------------
+    case 3:
+        if (dropplane.size() > 0)
+        {
+            for (const auto& planex : dropplane)
+            {
+                if (!PassesFilters(planex.planename)) continue;
+                SkinRowInline(planex.planename, &sBool[planex.planename],
+                [&]() {
+                    if (sBool[planex.planename])
+                        for (const auto& other : dropplane)
+                            if (other.planename != planex.planename)
+                                sBool[other.planename] = false;
+                    if (BRDropPlaneSkinConfigInstance.size() > 0)
+                        for (auto planeID : BRDropPlaneSkinConfigInstance) {
+                            if (!planeID) continue;
+                            dropplaneFields = (BRDropPlaneSkinFields*)((uintptr_t)planeID + 0x10);
+                            if (dropplaneFields->ID == 0) {
+                                dropplaneFields->ColorID            = planex.plane[0];
+                                dropplaneFields->ModelAsset1P       = planex.plane[1];
+                                dropplaneFields->ModelAsset3P       = planex.plane[2];
+                                dropplaneFields->ModelAssetCutScene = planex.plane[3];
+                                dropplaneFields->ModelAssetUI       = planex.plane[4];
+                                dropplaneFields->Priority           = planex.plane[5];
+                            }
+                        }
+                });
+            }
+        }
+        else ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "No plane skins loaded");
+        break;
+
+    // ---------------- WEAPONS ----------------
+    case 4:
+        if (!itemData.empty())
+        {
+            auto applyWeaponSkin = [&](const auto& getitem) {
+                int baseID  = getitem.WeaponConf[0];
+                int extraID = getitem.WeaponExtra[0];
+                int skinID  = getitem.WeaponConf[2];
+                int itemID  = getitem.Item2Inventory[0];
+                int lootID  = getitem.Item2Inventory[3];
+
+                for (auto item : itemInventoryInstance) {
+                    if (!item) continue;
+                    item2Fields = (Item2InventoryFields*)((uintptr_t)item + 0x20);
+                    if (item2Fields->ItemID == getitem.Item2Inventory[0] ||
+                        item2Fields->ItemID == getitem.Item2Inventory[3]) {
+                        item2Fields->WeaponAssetGroupID = getitem.Item2Inventory[1];
+                        item2Fields->WeaponIconID       = getitem.Item2Inventory[2];
+                    }
+                }
+                for (auto conf : weaponConfInstance) {
+                    if (!conf) continue;
+                    weaponconfFields = (WeaponConfFields*)((uintptr_t)conf + 0x20);
+                    if (baseID == weaponconfFields->ID || extraID == weaponconfFields->ID ||
+                        skinID == weaponconfFields->ID || itemID  == weaponconfFields->ID ||
+                        lootID == weaponconfFields->ID) {
+                        weaponconfFields->DefWeaponSkinID    = getitem.WeaponConf[2];
+                        weaponconfFields->DefaultKillBrocast = getitem.WeaponConf[3];
+                        weaponconfFields->ExternalUnVisible  = true;
+                        for (auto skinConf : weaponConfInstance) {
+                            if (!skinConf) continue;
+                            WeaponConfFields* sf = (WeaponConfFields*)((uintptr_t)skinConf + 0x20);
+                            if (sf->ID == getitem.WeaponConf[2]) { weaponconfFields->LOCID_Name = sf->LOCID_Name; break; }
+                        }
+                        if (baseID == weaponconfFields->ID) weaponconfFields->ColorID = getitem.WeaponConf[1];
+                    }
+                }
+                if (getitem.WeaponExtra[4] > 0) {
+                    activeKillEffects[baseID]  = getitem.WeaponExtra[4];
+                    activeKillEffects[extraID] = getitem.WeaponExtra[4];
+                    activeKillEffects[skinID]  = getitem.WeaponExtra[4];
+                    activeKillEffects[itemID]  = getitem.WeaponExtra[4];
+                    activeKillEffects[lootID]  = getitem.WeaponExtra[4];
+                }
+                for (auto extra : weaponExtraInstance) {
+                    if (!extra) continue;
+                    weaponextraFields = (WeaponConfExtraFields*)((uintptr_t)extra + 0x10);
+                    if (weaponextraFields->ID == baseID || weaponextraFields->ID == extraID ||
+                        weaponextraFields->ID == skinID || weaponextraFields->ID == itemID  ||
+                        weaponextraFields->ID == lootID) {
+                        if (getitem.itemName.find("[MYTHIC]") != std::string::npos) {
+                            weaponextraFields->DefaultMythicArmor = getitem.WeaponExtra[1];
+                            if (getitem.itemName.find("[MYTHIC] AK117 - Memento Mori") != std::string::npos)
+                                weaponextraFields->DefaultMythicSig = getitem.WeaponExtra[2];
+                        }
+                        weaponextraFields->DefaultDeadReplayEffectId = getitem.WeaponExtra[3];
+                        weaponextraFields->DefaultKillEffectId       = getitem.WeaponExtra[4];
+                    }
+                }
+                for (auto asset : weaponAssetGroupInstance) {
+                    if (!asset) continue;
+                    weaponAssetFields = (WeaponAssetGroupFields*)((uintptr_t)asset + 0x40);
+                    if (weaponAssetFields->Id == getitem.WeaponAsset[0])
+                        if (getitem.WeaponAsset[1] / 10 == getitem.WeaponAsset[2] / 10 && getitem.WeaponAsset[1] > 0)
+                            weaponAssetFields->FireEffectGroupID = getitem.WeaponAsset[1];
+                }
+                for (auto itemResource : itemResourceConfigInstance) {
+                    if (!itemResource) continue;
+                    itemFields = (ItemResourceFields*)((uintptr_t)itemResource + 0x10);
+                    if (itemFields->ID == skinID) {
+                        itemFields->FxAssetID         = getitem.WeaponConf[0];
+                        itemFields->InventoryModelID  = getitem.ItemResInt[1];
+                        itemFields->ModelAssetIDRaw   = getitem.ItemResInt[2];
+                        itemFields->UIMiniSpriteName  = getitem.ItemRes[0];
+                        itemFields->UISmallSpriteName = getitem.ItemRes[1];
+                        itemFields->UISpriteName      = getitem.ItemRes[2];
+                        itemFields->UISquareSpriteName= getitem.ItemRes[3];
+                    }
+                    if (itemFields->ID == skinID) {
+                        itemFields->FxAssetID         = getitem.ItemResInt[0];
+                        itemFields->InventoryModelID  = getitem.ItemResInt[1];
+                        itemFields->ModelAssetIDRaw   = getitem.ItemResInt[2];
+                        itemFields->UIMiniSpriteName  = getitem.ItemRes[0];
+                        itemFields->UISmallSpriteName = getitem.ItemRes[1];
+                        itemFields->UISquareSpriteName= getitem.ItemRes[3];
+                    }
+                    if (itemFields->ID == itemID) {
+                        itemFields->FxAssetID         = getitem.ItemResInt[0];
+                        itemFields->InventoryModelID  = getitem.ItemResInt[1];
+                        itemFields->ModelAssetIDRaw   = getitem.ItemResInt[2];
+                        itemFields->UIMiniSpriteName  = getitem.ItemRes[0];
+                        itemFields->UISmallSpriteName = getitem.ItemRes[1];
+                        itemFields->UISpriteName      = getitem.ItemRes[2];
+                    }
+                    if (itemFields->ID == lootID) {
+                        itemFields->FxAssetID         = getitem.ItemResInt[0];
+                        itemFields->InventoryModelID  = getitem.ItemResInt[1];
+                        itemFields->ModelAssetIDRaw   = getitem.ItemResInt[2];
+                        itemFields->UIMiniSpriteName  = getitem.ItemRes[0];
+                        itemFields->UISmallSpriteName = getitem.ItemRes[1];
+                        itemFields->UISpriteName      = getitem.ItemRes[2];
+                        itemFields->UISquareSpriteName= getitem.ItemRes[3];
+                    }
+                    if (itemFields->ID == extraID) {
+                        itemFields->FxAssetID         = getitem.ItemResInt[0];
+                        itemFields->InventoryModelID  = getitem.ItemResInt[1];
+                        itemFields->ModelAssetIDRaw   = getitem.ItemResInt[2];
+                        itemFields->UIMiniSpriteName  = getitem.ItemRes[0];
+                        itemFields->UISmallSpriteName = getitem.ItemRes[1];
+                        itemFields->UISpriteName      = getitem.ItemRes[2];
+                    }
+                    if (itemFields->ID == baseID) {
+                        itemFields->FxAssetID         = getitem.ItemResInt[0];
+                        itemFields->InventoryModelID  = getitem.ItemResInt[1];
+                        itemFields->ModelAssetIDRaw   = getitem.ItemResInt[2];
+                        itemFields->UIMiniSpriteName  = getitem.ItemRes[0];
+                        itemFields->UISmallSpriteName = getitem.ItemRes[1];
+                        itemFields->UISpriteName      = getitem.ItemRes[2];
+                    }
+                }
+
+                int fireEffectID = 0;
+                for (auto asset : weaponAssetGroupInstance) {
+                    if (!asset) continue;
+                    weaponAssetFields = (WeaponAssetGroupFields*)((uintptr_t)asset + 0x40);
+                    if (weaponAssetFields && weaponAssetFields->Id == getitem.WeaponAsset[0])
+                    { fireEffectID = weaponAssetFields->FireEffectGroupID; break; }
+                }
+                if (fireEffectID > 0) {
+                    for (auto fireConf : weaponFireEffectInstance) {
+                        if (!fireConf) continue;
+                        WeaponFireEffectFields* wfFields = (WeaponFireEffectFields*)((uintptr_t)fireConf + 0x10);
+                        if (!Tools::IsPtrValid(wfFields)) continue;
+                        if (wfFields->Id == fireEffectID) {
+                            wfFields->LevelEffectDelayTimeUI      = 0.1f;
+                            wfFields->LevelEffectDelayTimeUI_King = 0.1f;
+                            auto* a1 = *(Array<int>**)((uintptr_t)fireConf + 0x118);
+                            if (a1 && Tools::IsPtrValid(a1)) for (int i = 0; i < a1->getLength(); ++i) a1->m_Items[i] = 0;
+                            auto* a2 = *(Array<int>**)((uintptr_t)fireConf + 0x120);
+                            if (a2 && Tools::IsPtrValid(a2)) for (int i = 0; i < a2->getLength(); ++i) a2->m_Items[i] = 0;
+                            break;
+                        }
+                    }
+                }
+            };
+
+            for (const auto& getitem : itemData) {
+                if (!PassesFilters(getitem.itemName)) continue;
+                if (sBool[getitem.itemName]) {
+                    SkinRowInline(getitem.itemName, &sBool[getitem.itemName],
+                    [&, getitem]() {
+                        std::string currentBase = GetBaseWeaponName(getitem.itemName);
+                        for (const auto& other : itemData)
+                            if (other.itemName != getitem.itemName &&
+                                GetBaseWeaponName(other.itemName) == currentBase)
+                                sBool[other.itemName] = false;
+                        applyWeaponSkin(getitem);
+                    });
+                }
+            }
+            for (const auto& getitem : itemData) {
+                if (!PassesFilters(getitem.itemName)) continue;
+                if (!sBool[getitem.itemName]) {
+                    SkinRowInline(getitem.itemName, &sBool[getitem.itemName],
+                    [&, getitem]() {
+                        std::string currentBase = GetBaseWeaponName(getitem.itemName);
+                        for (const auto& other : itemData)
+                            if (other.itemName != getitem.itemName &&
+                                GetBaseWeaponName(other.itemName) == currentBase)
+                                sBool[other.itemName] = false;
+                        applyWeaponSkin(getitem);
+                    });
+                }
+            }
+        }
+        else ImGui::TextColored(ImVec4(1, 0.5f, 0.5f, 1), "No weapon skins loaded");
+        break;
+    }
+
+    ImGui::EndChild();
+    ImGui::PopStyleColor(); // ChildBg
+
+    ImGui::PopStyleColor(7);
+    ImGui::PopStyleVar(4);
+
+    // Close the outer SkinsTabContent child (opened at top of TABG==4)
+    ImGui::EndChild();
+    ImGui::PopStyleColor(); // outer ChildBg
+}
+
+
+
+                        
+                if (TABG == 5)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImColor(12, 12, 12, 150).Value);
+
+                    ImGui::SetCursorPos(ImVec2(165, 105));
+                    ImGui::BeginChild("License_Info", ImVec2(328, 235));
+                    {
+                        ImVec2 startPos = ImGui::GetCursorScreenPos();
+                        RenderLicenseInfo(draw, startPos);
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::SetCursorPos(ImVec2(165, 355));
+                    ImGui::BeginChild("Logo_Adjustable", ImVec2(328, 235));
+                    {
+                        RenderLogoSettings(draw);
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::SetCursorPos(ImVec2(512, 105));
+                    ImGui::BeginChild("Config_Management", ImVec2(328, 235));
+                    {
+                        RenderConfigManagement(draw);
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::SetCursorPos(ImVec2(512, 355));
+                    ImGui::BeginChild("Enhancement", ImVec2(328, 235));
+                    {
+                        RenderEnhancement();
+                    }
+                    ImGui::EndChild();
+
+                    ImGui::PopStyleColor();
+                }
+                
+                if (Config.ExtraMenu.Rpd) {
+                Patches.rpd.Modify();
+            }
+            else
+            {
+                Patches.rpd.Restore();
+            }
+
+                if (Config.ExtraMenu.WallHack)
+                {
+                    Patches.A1.Modify();
+                }
+                else
+                {
+                    Patches.A1.Restore();
+                }
+            }
+
+            if (!Config.ExtraMenu.HideColorPicker)
+            {
+                ImVec2 mainMenuPos = ImGui::GetWindowPos();
+                ImVec2 mainMenuSize = ImGui::GetWindowSize();
+
+                ImGui::End();
+
+                ImGui::SetNextWindowPos(ImVec2(mainMenuPos.x, mainMenuPos.y + mainMenuSize.y + 10), ImGuiCond_Always);
+ImGui::SetNextWindowSize(ImVec2(850, 30), ImGuiCond_Always); // slightly taller for bigger slider
+
+if (ImGui::Begin("ColorPicker", nullptr,
+    ImGuiWindowFlags_NoBackground |
+    ImGuiWindowFlags_NoSavedSettings |
+    ImGuiWindowFlags_NoTitleBar |
+    ImGuiWindowFlags_NoResize |
+    ImGuiWindowFlags_NoCollapse |
+    ImGuiWindowFlags_NoMove))
+{
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    ImVec2 pos = ImGui::GetWindowPos();
+
+    // ===== Easy-to-adjust values =====
+    const float pickerWidth  = 850.0f;
+    const float pickerHeight = 30.0f;   // bigger
+    const float padding      = 20.0f;
+    const float barHeight    = 10.0f;   // thicker
+    const float barRadius    = 15.0f;
+    const float selectorRadius = 15.0f; // bigger selector
+    const int   segments     = 300;     // much smoother gradient
+
+    ImColor bgColor(12, 12, 12, 150);
+
+    // ===== Background =====
+    draw->AddRectFilled(
+        pos,
+        ImVec2(pos.x + pickerWidth, pos.y + pickerHeight),
+        bgColor,
+        pickerHeight,
+        ImDrawFlags_RoundCornersAll
+    );
+
+    // ===== Gradient bar =====
+    float barX = pos.x + padding;
+    float barY = pos.y + (pickerHeight - barHeight) * 0.5f;
+    float barWidth = pickerWidth - padding * 2.0f;
+    float segWidth = barWidth / segments;
+
+    for (int i = 0; i < segments; i++)
+    {
+        float t1 = (float)i / segments;
+        float t2 = (float)(i + 1) / segments;
+
+        float r1, g1, b1, r2, g2, b2;
+        ImGui::ColorConvertHSVtoRGB(t1, 1.0f, 1.0f, r1, g1, b1);
+        ImGui::ColorConvertHSVtoRGB(t2, 1.0f, 1.0f, r2, g2, b2);
+
+        draw->AddRectFilledMultiColor(
+            ImVec2(barX + i * segWidth, barY),
+            ImVec2(barX + (i + 1) * segWidth, barY + barHeight),
+            ImColor(r1, g1, b1),
+            ImColor(r2, g2, b2),
+            ImColor(r2, g2, b2),
+            ImColor(r1, g1, b1)
+        );
+    }
+
+    draw->AddRect(
+        ImVec2(barX, barY),
+        ImVec2(barX + barWidth, barY + barHeight),
+        ImColor(255, 255, 255, 100),
+        barRadius,
+        ImDrawFlags_RoundCornersAll,
+        2.0f
+    );
+
+    // ===== Selector =====
+    static float selectedPos = barWidth * 0.5f;
+    float selectorX = barX + selectedPos;
+    float selectorY = barY + barHeight * 0.5f;
+
+    draw->AddCircleFilled(ImVec2(selectorX, selectorY), selectorRadius, ImColor(255, 255, 255), 64);
+    draw->AddCircle(ImVec2(selectorX, selectorY), selectorRadius, ImColor(0, 0, 0), 64, 3.0f);
+
+    // ===== Input =====
+    ImGui::SetCursorPos(ImVec2(padding, (pickerHeight - barHeight) * 0.5f));
+    ImGui::InvisibleButton("", ImVec2(barWidth, barHeight));
+
+    if (ImGui::IsItemActive() || ImGui::IsItemClicked())
+    {
+        float mouseX = ImGui::GetMousePos().x;
+        selectedPos = ImClamp(mouseX - barX, 0.0f, barWidth);
+
+        float t = selectedPos / barWidth;
+        float r, g, b;
+        ImGui::ColorConvertHSVtoRGB(t, 1.0f, 1.0f, r, g, b);
+
+        menu[0] = r;
+        menu[1] = g;
+        menu[2] = b;
+    }
+}
+ImGui::End();
+
+            }
+        }
+    }
+
+    RenderMenuNotifications();
+
+    auto Input_get_touchCount = (int (*)())(Class_Input_get_touchCount);
+    if (Input_get_touchCount() > 0)
+    {
+        auto Input_GetTouch = (Touch(*)(uintptr_t, int))(Class_Input_GetTouch);
+        auto Input_get_mousePosition = (Vector3(*)(uintptr_t))(Class_Input_get_mousePosition);
+        switch (Input_GetTouch(Config.ImGuiMenu.thiz, 0).m_Phase)
+        {
+            case TouchPhase::Began:
+            case TouchPhase::Stationary:
+                io->MouseDown[0] = true;
+                io->MousePos = ImVec2(Input_get_mousePosition(Config.ImGuiMenu.thiz).x, get_height() - Input_get_mousePosition(Config.ImGuiMenu.thiz).y);
+                break;
+            case TouchPhase::Ended:
+            case TouchPhase::Canceled:
+                io->MouseDown[0] = false;
+                Config.ImGuiMenu.clearMousePos = true;
+                break;
+            case TouchPhase::Moved:
+                io->MousePos = ImVec2(Input_get_mousePosition(Config.ImGuiMenu.thiz).x, get_height() - Input_get_mousePosition(Config.ImGuiMenu.thiz).y);
+                break;
+            default:
+                break;
+        }
+    }
+
+    ImGui::EndFrame();
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    return old_eglSwapBuffers(dpy, surface);
+}
+// ─────────────────────────────────────────────
+// Init_Thread2 (ANOGS Bypass Loader)
+// ─────────────────────────────────────────────
+size_t hook_strlen(const char *thread)
+{
+    if (strstr(thread, "eglSwapBuffers"))
+    {
+    }
+    return strlen(thread);
+}
+
+bool AutoActiveFix1 = true;
+bool (*orig_get_EnableVulkan)(void *instance);
+bool hook_get_EnableVulkan(void *instance)
+{
+    if (instance != NULL)
+    {
+        if (AutoActiveFix1 == true)
+        {
+            return false;
+        }
+    }
+    return false;
+}
+    
+
+bool AutoActiveFix2 = true;
+bool (*orig_ShouldCurDeviceEnableVK)(void *instance);
+bool hook_ShouldCurDeviceEnableVK(void *instance)
+{
+    if (instance != NULL)
+    {
+        if (AutoActiveFix2 == true)
+        {
+            return false;
+        }
+    }
+    return false;
+}
+    
+
+
+
+bool AutoActiveFix4 = true;
+bool (*orig_get_UseVulkanVRS)(void *instance);
+bool hook_get_UseVulkanVRS(void *instance)
+{
+    if (instance != NULL)
+    {
+        if (AutoActiveFix4 == true)
+        {
+            return false;
+        }
+    }
+    return false;
+}
+    
+typedef void (*SystemSetting_set_EnableVulkan)(void *, bool);
+SystemSetting_set_EnableVulkan oset_EnableVulkan;
+
+int64_t  (*o_disabled)(int64_t a1, int64_t *a2);
+int64_t  h_disabled(int64_t a1, int64_t *a2) {
+a1 = 0;
+return 0LL;
+
+}
+//----------------------------------------------------------------------------------------------------------------------------------------------------
+void Init_Thread2() {
+    while (!m_Anogs) {
+        m_Anogs = Tools::GetBaseAddress("libanogs.so");
+
+        sleep(1);
+    }
+
+    
+    LOGI("libanogs.so: %p", m_Anogs);
+    
+    /* ===== ʜᴏᴏᴋ ===== */
+
+
+    // public bool get_EnableVulkan()
+HOOK_LIB("libunity.so", "0xa9a4a8c", h_disabled, o_disabled);
+
+
+//Tools::blocklib("libanogs.so");
+    
+uintptr_t fixmod1 = 0xa9a4a8c; // SystemSetting::get_EnableVulkan
+uintptr_t fixmod2 = 0xa9a4c7c; // SystemSetting::ShouldCurDeviceEnableVK
+uintptr_t fixmod3 = 0x647c5b8; // CODPostEffectChain::get_UseVulkanVRS
+uintptr_t fixmod4 = 0xa9a4fc0; // SystemSetting::set_EnableVulkan
+
+}
+
+
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <link.h>
+#include <dlfcn.h>
+#include <errno.h>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <random>
+#include <chrono>
+
+// ────────────────────────────────────────────────
+//   Structure to hold segment info
+// ────────────────────────────────────────────────
+struct Segment {
+    uintptr_t addr;
+    size_t size;
+    int prot;
+};
+
+// ────────────────────────────────────────────────
+//   Callback for dl_iterate_phdr to find target library segments
+// ────────────────────────────────────────────────
+static int FindLibrarySegments(const char* target_substr, std::vector<Segment>& segments) {
+    struct CallbackData {
+        const char* substr;
+        std::vector<Segment>* segs;
+    };
+
+    auto callback = [](struct dl_phdr_info* info, size_t size, void* data) -> int {
+        auto* cbdata = static_cast<CallbackData*>(data);
+        if (strstr(info->dlpi_name, cbdata->substr) == nullptr) {
+            return 0;
+        }
+
+        for (int i = 0; i < info->dlpi_phnum; ++i) {
+            const ElfW(Phdr)& phdr = info->dlpi_phdr[i];
+            if (phdr.p_type != PT_LOAD) continue;
+
+            int prot = 0;
+            if (phdr.p_flags & PF_R) prot |= PROT_READ;
+            if (phdr.p_flags & PF_W) prot |= PROT_WRITE;
+            if (phdr.p_flags & PF_X) prot |= PROT_EXEC;
+
+            cbdata->segs->push_back({
+                info->dlpi_addr + phdr.p_vaddr,
+                static_cast<size_t>(phdr.p_memsz),
+                prot
+            });
+        }
+        return 0;  // Continue iterating if needed
+    };
+
+    CallbackData data{target_substr, &segments};
+    dl_iterate_phdr(callback, &data);
+    return !segments.empty();
+}
+
+// ────────────────────────────────────────────────
+//   Main remap function - stealthy and chunked
+// ────────────────────────────────────────────────
+bool RemapLibraryStealth(const char* target_substring, bool anti_memscan = true) {
+    if (!target_substring || !*target_substring) return false;
+
+    std::vector<Segment> segments;
+    if (!FindLibrarySegments(target_substring, segments)) return false;
+
+    // Random number generator for chunk sizes (stealth)
+    std::mt19937 gen(std::chrono::steady_clock::now().time_since_epoch().count());
+    std::uniform_int_distribution<size_t> dist(32 * 1024, 256 * 1024);  // 32-256 KiB
+
+    bool overall_success = true;
+
+    for (const auto& seg : segments) {
+        if (seg.size == 0 || seg.size > 0x80000000ULL) continue;  // Sanity
+
+        void* original = reinterpret_cast<void*>(seg.addr);
+        int orig_prot = seg.prot;
+
+        // Allocate and copy in random-sized chunks
+        size_t remaining = seg.size;
+        uintptr_t offset = 0;
+
+        while (remaining > 0) {
+            size_t chunk_size = std::min(dist(gen), remaining);
+
+            void* temp = mmap(nullptr, chunk_size, PROT_READ | PROT_WRITE,
+                              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+            if (temp == MAP_FAILED) {
+                overall_success = false;
+                break;
+            }
+
+            // Temporarily add READ if needed
+            int copy_prot = orig_prot;
+            if (!(orig_prot & PROT_READ)) {
+                copy_prot |= PROT_READ;
+                if (mprotect(original, seg.size, copy_prot) != 0) {
+                    munmap(temp, chunk_size);
+                    overall_success = false;
+                    break;
+                }
+            }
+
+            memcpy(temp, reinterpret_cast<char*>(original) + offset, chunk_size);
+
+            // Make destination writable for overwrite
+            if (mprotect(reinterpret_cast<char*>(original) + offset, chunk_size,
+                         PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+                munmap(temp, chunk_size);
+                overall_success = false;
+                break;
+            }
+
+            // Overwrite in place
+            memcpy(reinterpret_cast<char*>(original) + offset, temp, chunk_size);
+
+            // Restore original prot
+            mprotect(reinterpret_cast<char*>(original) + offset, chunk_size, orig_prot);
+
+            // Cleanup
+            munmap(temp, chunk_size);
+
+            offset += chunk_size;
+            remaining -= chunk_size;
+        }
+
+        if (!overall_success) break;
+
+        if (anti_memscan) {
+            // Prevent core dumps / some scans
+            madvise(original, seg.size, MADV_DONTDUMP);
+        }
+    }
+
+    return overall_success;
+}
+
+void Init_Thread()
+{
+    while (!m_unity)
+    {
+        m_unity = Tools::GetBaseAddress("libunity.so");
+        sleep(1);
+    }
+    LOGI("libunity.so: %p", m_unity);
+    UpdateAllOffset();
+
+    MemoryPatch::createWithHex("libunity.so", 0xa9a4a8c, "00 00 80 D2 C0 03 5F D6").Modify();
+    MemoryPatch::createWithHex("libunity.so", 0xa9a4c7c, "00 00 80 D2 C0 03 5F D6").Modify();
+    MemoryPatch::createWithHex("libunity.so", 0x647c5b8, "00 00 80 D2 C0 03 5F D6").Modify();
+
+   Patches.A1 = MemoryPatch::createWithHex("libunity.so", 0x8D781DC, "1F 20 03 D5");
+   Patches.rpd = MemoryPatch::createWithHex("libunity.so",0xa9ca598, "00 2C 40 BC C0 03 5F D6");
+        
+        //-- Bullet Track
+        DobbyHook((void*)getAbsoluteAddress("libunity.so", 0xaac8a60), (void*)&WeaponFireComponent_Instant_CreateBulletLine, (void**)&oWeaponFireComponent_Instant_CreateBulletLine);
+    DobbyHook((void*)getAbsoluteAddress("libunity.so", 0xaad4784), (void*)&WeaponFireComponent_Instant_CreateBulletProjectile, (void**)&oWeaponFireComponent_Instant_CreateBulletProjectile);
+    
+        //-- Unlock 120 fps (Codm settings)
+      DobbyHook((void*)getAbsoluteAddress("libunity.so", 0xa9925f4), (void*)hooked_SetUltraFrameRateDeviceInfo, (void**)&orig_SetUltraFrameRateDeviceInfo);
+        
+          DobbyHook((void*)getAbsoluteAddress("libunity.so", 0xa993c10), (void*)GetFrameRateValue, (void**)&orig_GetFrameRateValue);
+        
+        InitializeAllHooks();
+        ApplyKfox();
+   
+    auto swapBuffers = ((uintptr_t) DobbySymbolResolver(OBFUSCATE("libunity.so"), OBFUSCATE("eglSwapBuffers")));
+    KittyMemory::ProtectAddr((void *)swapBuffers, sizeof(swapBuffers), PROT_READ | PROT_WRITE | PROT_EXEC);
+    DobbyHook((void *) swapBuffers, (void *) hook_eglSwapBuffers, (void **) &old_eglSwapBuffers);
+
+
+}
+
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    VM = vm;
+
+    std::thread(Init_Thread).detach();
+    std::thread(Init_Thread2).detach();
+    std::thread(Skins_Thread).detach();
+
+    return JNI_VERSION_1_6;
+}
